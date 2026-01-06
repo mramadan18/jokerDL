@@ -1,38 +1,89 @@
-<p align="center"><img src="https://i.imgur.com/NZfsD1p.png"></p>
+# 🃏 JokerDL - The Ultimate Media Downloader
 
-## Usage
+<p align="center">
+  <img src="https://img.shields.io/badge/Electron-34.0.0-blue?style=for-the-badge&logo=electron" alt="Electron">
+  <img src="https://img.shields.io/badge/Next.js-14.2.4-black?style=for-the-badge&logo=next.js" alt="Next.js">
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4.1.18-38B2AC?style=for-the-badge&logo=tailwind-css" alt="TailwindCSS">
+  <img src="https://img.shields.io/badge/yt--dlp-Latest-red?style=for-the-badge&logo=youtube" alt="yt-dlp">
+</p>
 
-### Create an App
+**JokerDL** is a premium, high-performance desktop application designed to make downloading media from the internet as easy as a single click. Built with Electron, Next.js, and the power of `yt-dlp`, it supports thousands of websites with a beautiful, modern user interface.
 
-```
-# with npx
-$ npx create-nextron-app my-app --example basic-lang-typescript
+---
 
-# with yarn
-$ yarn create nextron-app my-app --example basic-lang-typescript
+## ✨ Features
 
-# with pnpm
-$ pnpm dlx create-nextron-app my-app --example basic-lang-typescript
-```
+- 🚀 **Universal Support**: Download from YouTube, TikTok, Instagram, Twitter(X), Facebook, Vimeo, and 1000+ other sites.
+- 📊 **Real-time Progress**: Track download speed, ETA, and progress percentage with a smooth, live-updating UI.
+- 🎞️ **Quality Selection**: Choose your preferred quality from 360p up to 4K (if available).
+- 🎵 **Audio Extraction**: Download high-quality audio directly in MP3, M4A, or FLAC formats.
+- 📝 **Info Extraction**: See title, duration, uploader, and thumbnails before you even start the download.
+- 🃏 **Smart Batching**: Add multiple links to the queue and download them sequentially.
+- 💎 **Premium UI**: Dark-mode-first aesthetic with Glassmorphism effects and smooth Framer Motion animations.
+- 🛠️ **Binary Management**: Automatically downloads and updates the latest `yt-dlp` engine in the background.
 
-### Install Dependencies
+---
 
-```
-$ cd my-app
+## 🛠️ Tech Stack
 
-# using yarn or npm
-$ yarn (or `npm install`)
+- **Framework**: [Nextron](https://github.com/saltyshippo/nextron) (Next.js + Electron)
+- **UI Components**: [HeroUI](https://heroui.com/) (formerly NextUI)
+- **Styling**: Tailwind CSS v4
+- **Animations**: Framer Motion
+- **Icons**: Lucide React
+- **Core Engine**: [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 
-# using pnpm
-$ pnpm install --shamefully-hoist
-```
+---
 
-### Use it
+## 🚀 Getting Started
 
-```
-# development mode
-$ yarn dev (or `npm run dev` or `pnpm run dev`)
+### Prerequisites
 
-# production build
-$ yarn build (or `npm run build` or `pnpm run build`)
-```
+- [Node.js](https://nodejs.org/) (LTS version recommended)
+- [NPM](https://www.npmjs.com/) or [Yarn](https://yarnpkg.com/)
+
+### Installation
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/mramadan18/jokerDL.git
+   cd jokerDL
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Run in development mode:
+
+   ```bash
+   npm run dev
+   ```
+
+4. Build for production:
+   ```bash
+   npm run build
+   ```
+
+---
+
+## 📁 Project Structure
+
+- `main/`: Electron main process files, IPC handlers, and backend services.
+- `renderer/`: Next.js frontend, components, hooks, and styles.
+- `resources/`: Application assets and icons.
+
+---
+
+## ⚖️ License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+<p align="center">
+  Developed with ❤️ by <b>Joker Team</b>
+</p>
