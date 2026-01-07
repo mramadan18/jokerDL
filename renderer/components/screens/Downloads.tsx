@@ -188,8 +188,12 @@ function DownloadCard({
                   </>
                 )}
                 <span>
-                  {formatBytes(item.progress.downloadedBytes)}
+                  {item.status === DownloadStatus.COMPLETED &&
+                  item.progress.totalBytes
+                    ? formatBytes(item.progress.totalBytes)
+                    : formatBytes(item.progress.downloadedBytes)}
                   {item.progress.totalBytes &&
+                    item.status !== DownloadStatus.COMPLETED &&
                     ` / ${formatBytes(item.progress.totalBytes)}`}
                 </span>
               </div>

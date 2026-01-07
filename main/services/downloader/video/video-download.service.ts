@@ -35,9 +35,18 @@ import {
 const PATTERNS = {
   // [download]   5.0% of 100.00MiB at 5.00MiB/s ETA 00:19
   download:
-    /\[download\]\s+(\d+\.?\d*)%\s+of\s+~?(\d+\.?\d*)(KiB|MiB|GiB|B)\s+at\s+(\d+\.?\d*)(KiB|MiB|GiB|B)\/s\s+ETA\s+(\d+:\d+(?::\d+)?)/i,
-  // Alternative format: [download]  50.0% of ~   100.00MiB at    5.00MiB/s ETA 00:10
+    /\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*(\d+\.?\d*)(KiB|MiB|GiB|B)\s+at\s+(\d+\.?\d*)(KiB|MiB|GiB|B)\/s\s+ETA\s+(\d+:\d+(?::\d+)?)/i,
+  // Alternative format: [download]  50.0% of ~   100.00MiB at    5.00MiB/s ETA 00:10 (frag 5/100)
+  downloadWithFrag:
+    /\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*(\d+\.?\d*)(KiB|MiB|GiB|B)\s+at\s+(\d+\.?\d*)(KiB|MiB|GiB|B)\/s.*frag\s+(\d+)\/(\d+)/i,
+  // Simple percentage pattern
   downloadAlt: /\[download\]\s+(\d+\.?\d*)%/,
+  // Size pattern: of ~  123.45MiB or of 123.45MiB
+  sizePattern: /of\s+~?\s*(\d+\.?\d*)(KiB|MiB|GiB|B)/i,
+  // Speed pattern
+  speedPattern: /at\s+(\d+\.?\d*)(KiB|MiB|GiB|B)\/s/i,
+  // ETA pattern
+  etaPattern: /ETA\s+(\d+:\d+(?::\d+)?)/i,
   // [download] Destination: filename.mp4
   destination: /\[download\]\s+Destination:\s+(.+)/,
   // [Merger] Merging formats into "filename.mp4"
@@ -46,10 +55,14 @@ const PATTERNS = {
   ffmpegMerge: /\[ffmpeg\]\s+Merging formats into\s+"(.+)"/,
   // Already downloaded
   alreadyDownloaded: /\[download\]\s+(.+) has already been downloaded/,
-  // Download completed
-  downloadComplete: /\[download\]\s+100%/,
+  // Download completed: [download] 100% of or 100.0%
+  downloadComplete: /\[download\]\s+100(\.0)?%/,
   // Fragment download: [download] Downloading fragment 5 of 100
   fragment: /\[download\]\s+Downloading\s+fragment\s+(\d+)\s+of\s+(\d+)/,
+  // Deleting original file (indicates merge success)
+  deleteOriginal: /Deleting original file/,
+  // ExtractAudio or convert
+  postProcess: /\[(ExtractAudio|ffmpeg)\]/,
 };
 
 /**
@@ -95,6 +108,8 @@ export class VideoDownloadService extends EventEmitter {
   > = new Map();
   private downloadQueue: DownloadItem[] = [];
   private maxConcurrent: number = 3;
+  // Track downloads that reached 100% or completed merge
+  private completedDownloads: Set<string> = new Set();
 
   constructor(maxConcurrent: number = 3) {
     super();
@@ -240,6 +255,19 @@ export class VideoDownloadService extends EventEmitter {
 
     const outputFilePath = path.join(outputDir, filename);
 
+    // Try to get initial file size from videoInfo
+    let initialTotalBytes: number | null = null;
+    if (videoInfo && videoInfo.formats && videoInfo.formats.length > 0) {
+      // Get file size from the first format that has it
+      const formatWithSize = videoInfo.formats.find(
+        (f) => f.filesize || f.filesizeApprox
+      );
+      if (formatWithSize) {
+        initialTotalBytes =
+          formatWithSize.filesize || formatWithSize.filesizeApprox;
+      }
+    }
+
     const downloadItem: DownloadItem = {
       id: downloadId,
       url: options.url,
@@ -251,7 +279,7 @@ export class VideoDownloadService extends EventEmitter {
         status: DownloadStatus.PENDING,
         progress: 0,
         downloadedBytes: 0,
-        totalBytes: null,
+        totalBytes: initialTotalBytes,
         speed: null,
         speedString: null,
         eta: null,
@@ -344,11 +372,22 @@ export class VideoDownloadService extends EventEmitter {
       process.on("close", (code) => {
         this.activeDownloads.delete(item.id);
 
-        if (code === 0) {
+        // Check if download reached 100% (even if exit code is non-zero)
+        const reachedCompletion = this.completedDownloads.has(item.id);
+
+        if (code === 0 || reachedCompletion) {
           item.status = DownloadStatus.COMPLETED;
           item.completedAt = new Date();
           item.progress.status = DownloadStatus.COMPLETED;
           item.progress.progress = 100;
+
+          // Ensure downloadedBytes matches totalBytes at completion
+          if (item.progress.totalBytes) {
+            item.progress.downloadedBytes = item.progress.totalBytes;
+          }
+
+          // Clean up tracking
+          this.completedDownloads.delete(item.id);
 
           this.emit("complete", item);
         } else if (item.status !== DownloadStatus.CANCELLED) {
@@ -407,13 +446,26 @@ export class VideoDownloadService extends EventEmitter {
         item.filename = item.progress.filename;
       }
 
-      // Check for merger
+      // Check for merger (indicates video+audio merge, almost done)
       const mergerMatch =
         line.match(PATTERNS.merger) || line.match(PATTERNS.ffmpegMerge);
       if (mergerMatch) {
         item.status = DownloadStatus.MERGING;
         item.progress.status = DownloadStatus.MERGING;
+        // Mark as completed when merge starts (it will finish)
+        this.completedDownloads.add(item.id);
         this.emit("status-changed", item);
+      }
+
+      // Check for post-processing (ffmpeg, ExtractAudio)
+      if (line.match(PATTERNS.postProcess)) {
+        // Mark as completed when post-processing starts
+        this.completedDownloads.add(item.id);
+      }
+
+      // Check for deleting original (means merge succeeded)
+      if (line.match(PATTERNS.deleteOriginal)) {
+        this.completedDownloads.add(item.id);
       }
 
       // Check for fragment download
@@ -423,7 +475,7 @@ export class VideoDownloadService extends EventEmitter {
         item.progress.totalFragments = parseInt(fragmentMatch[2]);
       }
 
-      // Check for download progress
+      // Check for download progress - try full pattern first
       const downloadMatch = line.match(PATTERNS.download);
       if (downloadMatch) {
         const [, percent, size, sizeUnit, speed, speedUnit, eta] =
@@ -445,17 +497,51 @@ export class VideoDownloadService extends EventEmitter {
 
         this.emit("progress", item.progress);
       } else {
-        // Try alternative progress pattern
+        // Try to extract parts separately for more flexibility
         const altMatch = line.match(PATTERNS.downloadAlt);
         if (altMatch) {
-          item.progress.progress = parseFloat(altMatch[1]);
+          const percentNum = parseFloat(altMatch[1]);
+          item.progress.progress = percentNum;
+
+          // Try to get size separately
+          const sizeMatch = line.match(PATTERNS.sizePattern);
+          if (sizeMatch) {
+            const totalBytes = parseSize(
+              parseFloat(sizeMatch[1]),
+              sizeMatch[2]
+            );
+            item.progress.totalBytes = totalBytes;
+            item.progress.downloadedBytes = totalBytes * (percentNum / 100);
+          }
+
+          // Try to get speed separately
+          const speedMatch = line.match(PATTERNS.speedPattern);
+          if (speedMatch) {
+            const speedBytes = parseSize(
+              parseFloat(speedMatch[1]),
+              speedMatch[2]
+            );
+            item.progress.speed = speedBytes;
+            item.progress.speedString = formatSpeed(speedBytes);
+          }
+
+          // Try to get ETA separately
+          const etaMatch = line.match(PATTERNS.etaPattern);
+          if (etaMatch) {
+            const etaSeconds = parseEta(etaMatch[1]);
+            item.progress.eta = etaSeconds;
+            item.progress.etaString = formatETA(etaSeconds);
+          }
+
           this.emit("progress", item.progress);
         }
       }
 
-      // Check for completion
+      // Check for completion (100%)
       if (line.match(PATTERNS.downloadComplete)) {
         item.progress.progress = 100;
+        // Mark as completed
+        this.completedDownloads.add(item.id);
         this.emit("progress", item.progress);
       }
 
@@ -464,6 +550,8 @@ export class VideoDownloadService extends EventEmitter {
       if (alreadyMatch) {
         item.progress.progress = 100;
         item.progress.filename = path.basename(alreadyMatch[1]);
+        // Mark as completed
+        this.completedDownloads.add(item.id);
         this.emit("progress", item.progress);
       }
     }
