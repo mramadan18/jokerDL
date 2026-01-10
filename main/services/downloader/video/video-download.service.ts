@@ -289,6 +289,7 @@ export class VideoDownloadService extends EventEmitter {
     }
 
     // Sort options by resolution descending (highest quality first)
+    // First option is now the default (no "best" option)
     const sortedOptions = options.sort((a, b) => {
       const getRes = (key: string) => parseInt(key) || 0;
       const resA = getRes(a.key);
@@ -296,16 +297,6 @@ export class VideoDownloadService extends EventEmitter {
       if (resA !== resB) return resB - resA;
       return a.key === "bestaudio" ? 1 : -1;
     });
-
-    // Add "Best Quality" auto option at the very top
-    if (sortedOptions.length > 0 && sortedOptions[0].key !== "bestaudio") {
-      const best = sortedOptions[0];
-      sortedOptions.unshift({
-        ...best,
-        key: "best",
-        label: "Best Quality (Auto)",
-      });
-    }
 
     return sortedOptions;
   }
@@ -420,12 +411,7 @@ export class VideoDownloadService extends EventEmitter {
 
         if (qualityOption) {
           // Build format selector from the quality option
-          if (qualityOption.key === "best") {
-            // Prefer h264 (avc1) codec for maximum compatibility
-            // Some platforms use HEVC/VP9 which don't play on all players
-            formatSelector =
-              "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best";
-          } else if (qualityOption.key === "bestaudio") {
+          if (qualityOption.key === "bestaudio") {
             formatSelector = "bestaudio";
           } else if (qualityOption.videoFormat && qualityOption.audioFormat) {
             // DASH streams (YouTube, Vimeo, Facebook, etc.): video + audio separate
@@ -468,8 +454,6 @@ export class VideoDownloadService extends EventEmitter {
       // All selectors prefer h264 (avc1) codec for maximum compatibility
       if (!formatSelector) {
         const qualityMap: Record<string, string> = {
-          [DownloadQuality.BEST]:
-            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
           [DownloadQuality.BEST_VIDEO]:
             "bestvideo[vcodec^=avc1]+bestaudio/bestvideo+bestaudio/best",
           [DownloadQuality.QUALITY_4K]:
@@ -491,11 +475,27 @@ export class VideoDownloadService extends EventEmitter {
 
       args.push("-f", formatSelector);
     } else {
-      // Default to best quality if no quality specified
-      args.push(
-        "-f",
-        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-      );
+      // Default to first available quality if no quality specified
+      if (videoInfo?.qualityOptions && videoInfo.qualityOptions.length > 0) {
+        const firstQuality = videoInfo.qualityOptions[0];
+        if (firstQuality.videoFormat && firstQuality.audioFormat) {
+          const videoId = firstQuality.videoFormat.formatId;
+          const audioId = firstQuality.audioFormat.formatId;
+          args.push("-f", `${videoId}+${audioId}/bestvideo+bestaudio/best`);
+        } else if (firstQuality.videoFormat) {
+          args.push("-f", firstQuality.videoFormat.formatId);
+        } else {
+          args.push(
+            "-f",
+            "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+          );
+        }
+      } else {
+        args.push(
+          "-f",
+          "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+        );
+      }
     }
 
     // Merge format for video+audio
@@ -603,21 +603,49 @@ export class VideoDownloadService extends EventEmitter {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
+    // Get quality label for filename
+    let qualityLabel: string | null = null;
+    if (videoInfo && options.quality) {
+      const qualityOption = videoInfo.qualityOptions?.find(
+        (opt) => opt.key === options.quality
+      );
+
+      if (qualityOption) {
+        // Prefer quality field (e.g., "1080p", "720p")
+        if (qualityOption.quality) {
+          qualityLabel = qualityOption.quality;
+        }
+        // Fallback to key if it's a valid quality (not "best" or "bestaudio")
+        else if (qualityOption.key && qualityOption.key !== "bestaudio") {
+          qualityLabel = qualityOption.key;
+        }
+      }
+    }
+
     // Generate filename template
-    // Always use yt-dlp template to avoid path length issues and let yt-dlp handle sanitization
     let filenameTemplate: string;
     if (options.filename && !options.filename.includes("%")) {
-      // User provided a specific filename - sanitize it
-      const sanitized = sanitizeFilename(options.filename, 200);
-      filenameTemplate = sanitized;
+      // User provided specific filename
+      if (qualityLabel) {
+        const ext = path.extname(options.filename);
+        const nameWithoutExt = options.filename.replace(ext, "");
+        filenameTemplate = sanitizeFilename(
+          `${nameWithoutExt}.${qualityLabel}${ext}`,
+          200
+        );
+      } else {
+        filenameTemplate = sanitizeFilename(options.filename, 200);
+      }
     } else if (options.filename) {
-      // User provided a template
-      filenameTemplate = options.filename;
+      // User provided template
+      filenameTemplate = qualityLabel
+        ? options.filename.replace(/\.%\(ext\)s$/, `.${qualityLabel}.%(ext)s`)
+        : options.filename;
     } else {
-      // Use yt-dlp template with sanitization
-      // Limit title to 100 chars to avoid path length issues on Windows (MAX_PATH = 260)
-      // yt-dlp will sanitize invalid filesystem chars automatically (supports Unicode including Arabic)
-      filenameTemplate = "%(title).100s.%(ext)s";
+      // Default template
+      filenameTemplate = qualityLabel
+        ? `%(title).100s.${qualityLabel}.%(ext)s`
+        : "%(title).100s.%(ext)s";
     }
 
     // Build output path with template
@@ -625,15 +653,79 @@ export class VideoDownloadService extends EventEmitter {
     const outputFilePath = path.join(outputDir, filenameTemplate);
 
     // Try to get initial file size from videoInfo
+    // Prefer using totalSize from qualityOption (which includes video + audio for DASH streams)
     let initialTotalBytes: number | null = null;
-    if (videoInfo && videoInfo.formats && videoInfo.formats.length > 0) {
-      // Get file size from the first format that has it
-      const formatWithSize = videoInfo.formats.find(
-        (f) => f.filesize || f.filesizeApprox
+
+    if (videoInfo && options.quality) {
+      // Try to get totalSize from the selected qualityOption
+      const qualityOption = videoInfo.qualityOptions?.find(
+        (opt) => opt.key === options.quality
       );
-      if (formatWithSize) {
-        initialTotalBytes =
-          formatWithSize.filesize || formatWithSize.filesizeApprox;
+
+      if (qualityOption && qualityOption.totalSize) {
+        initialTotalBytes = qualityOption.totalSize;
+      }
+    }
+
+    // Fallback: get file size from qualityOptions if specific qualityOption doesn't have totalSize
+    if (
+      !initialTotalBytes &&
+      videoInfo &&
+      videoInfo.qualityOptions &&
+      videoInfo.qualityOptions.length > 0
+    ) {
+      // Use the first qualityOption's totalSize (usually the best quality)
+      const firstQualityOption =
+        videoInfo.qualityOptions.find(
+          (opt) => opt.totalSize && opt.key !== "bestaudio"
+        ) || videoInfo.qualityOptions[0];
+
+      if (firstQualityOption && firstQualityOption.totalSize) {
+        initialTotalBytes = firstQualityOption.totalSize;
+      }
+    }
+
+    // Last resort: get file size from formats if qualityOptions don't have totalSize
+    if (
+      !initialTotalBytes &&
+      videoInfo &&
+      videoInfo.formats &&
+      videoInfo.formats.length > 0
+    ) {
+      // For DASH streams, we need to estimate by finding the largest video format
+      // and adding the best audio format size
+      const videoFormats = videoInfo.formats.filter((f) => f.hasVideo);
+      const audioFormats = videoInfo.formats.filter(
+        (f) => f.hasAudio && !f.hasVideo
+      );
+
+      let maxVideoSize = 0;
+      let maxAudioSize = 0;
+
+      videoFormats.forEach((f) => {
+        const size = f.filesize || f.filesizeApprox || 0;
+        if (size > maxVideoSize) maxVideoSize = size;
+      });
+
+      audioFormats.forEach((f) => {
+        const size = f.filesize || f.filesizeApprox || 0;
+        if (size > maxAudioSize) maxAudioSize = size;
+      });
+
+      // If we have separate video and audio, sum them
+      if (maxVideoSize > 0 && maxAudioSize > 0) {
+        initialTotalBytes = maxVideoSize + maxAudioSize;
+      } else if (maxVideoSize > 0) {
+        initialTotalBytes = maxVideoSize;
+      } else {
+        // Last resort: get file size from the first format that has it
+        const formatWithSize = videoInfo.formats.find(
+          (f) => f.filesize || f.filesizeApprox
+        );
+        if (formatWithSize) {
+          initialTotalBytes =
+            formatWithSize.filesize || formatWithSize.filesizeApprox;
+        }
       }
     }
 
@@ -707,6 +799,11 @@ export class VideoDownloadService extends EventEmitter {
     item.startedAt = new Date();
     item.progress.status = DownloadStatus.DOWNLOADING;
 
+    // Reset progress when starting a new download
+    // This ensures downloadedBytes starts from 0 even if totalBytes is already set
+    item.progress.progress = 0;
+    item.progress.downloadedBytes = 0;
+
     this.emit("status-changed", item);
 
     const outputFilePath = path.join(
@@ -725,22 +822,69 @@ export class VideoDownloadService extends EventEmitter {
         item,
       });
 
+      // Track when download actually started (first progress event)
+      let firstProgressReceived = false;
+
       // Handle Progress
       eventEmitter.on("progress", (progress) => {
-        item.progress.progress = progress.percent;
+        const wasFirstProgress = !firstProgressReceived;
 
+        // Mark that we've received the first progress event
+        if (!firstProgressReceived) {
+          firstProgressReceived = true;
+          // Ensure downloadedBytes starts from 0 when download actually begins
+          item.progress.downloadedBytes = 0;
+        }
+
+        // Update progress percentage (with safety check)
+        if (progress.percent !== undefined && progress.percent !== null) {
+          item.progress.progress = Math.min(100, Math.max(0, progress.percent));
+        }
+
+        // Update total bytes if available from progress event
         if (progress.totalSize) {
-          item.progress.totalBytes =
+          const newTotalBytes =
             typeof progress.totalSize === "string"
               ? parseBytes(progress.totalSize)
               : progress.totalSize;
+
+          // Only update if we got a valid value
+          if (newTotalBytes !== null && newTotalBytes > 0) {
+            item.progress.totalBytes = newTotalBytes;
+          }
         }
 
-        // Calculate downloaded bytes if total bytes is available
-        if (item.progress.totalBytes) {
-          item.progress.downloadedBytes =
-            (item.progress.progress / 100) * item.progress.totalBytes;
+        // Calculate downloaded bytes from percentage and total bytes
+        // This ensures downloadedBytes is always updated when we have the necessary data
+        // Use totalBytes from progress event, or fall back to initialTotalBytes from videoInfo
+        const totalBytesToUse = item.progress.totalBytes;
+
+        if (
+          totalBytesToUse &&
+          totalBytesToUse > 0 &&
+          progress.percent !== undefined &&
+          progress.percent !== null
+        ) {
+          const calculatedBytes = Math.round(
+            (progress.percent / 100) * totalBytesToUse
+          );
+
+          // Only update if calculated value is greater than current
+          // This ensures downloadedBytes increases gradually, not jumps to high values
+          if (calculatedBytes > item.progress.downloadedBytes) {
+            // Additional safety check: if this is the first progress event and calculatedBytes
+            // is very high (e.g., > 50% of total), it might be a reporting error from yt-dlp
+            // In that case, ignore the high value and start from 0
+            if (wasFirstProgress && calculatedBytes > totalBytesToUse * 0.5) {
+              // If first progress shows > 50%, it's likely incorrect, keep at 0
+              item.progress.downloadedBytes = 0;
+            } else {
+              item.progress.downloadedBytes = calculatedBytes;
+            }
+          }
         }
+        // If totalBytes is not available yet, downloadedBytes will remain at its current value
+        // This prevents resetting to 0 when totalBytes hasn't been determined yet
 
         item.progress.speedString = progress.currentSpeed;
         item.progress.etaString = progress.eta;
@@ -748,9 +892,33 @@ export class VideoDownloadService extends EventEmitter {
         this.emit("progress", item.progress);
       });
 
+      // Track stderr messages for better error reporting
+      let stderrMessages: string[] = [];
+
       // Handle Events (to detect filename, merging, etc)
       eventEmitter.on("ytDlpEvent", (eventType, eventData) => {
         // console.log(eventType, eventData);
+
+        // Capture error messages from stderr
+        if (eventData) {
+          const errorData = String(eventData);
+
+          // Check for error patterns
+          if (
+            errorData.includes("ERROR:") ||
+            errorData.includes("WARNING:") ||
+            errorData.includes("Cannot parse data") ||
+            errorData.includes("Unsupported URL") ||
+            errorData.includes("Video unavailable")
+          ) {
+            stderrMessages.push(errorData);
+            // Store the error message for later use
+            if (!item.error) {
+              item.error = errorData;
+            }
+          }
+        }
+
         if (
           eventType === "youtube-dl" &&
           eventData.includes("[download] Destination:")
@@ -785,12 +953,122 @@ export class VideoDownloadService extends EventEmitter {
           item.completedAt = new Date();
           item.progress.status = DownloadStatus.COMPLETED;
           item.progress.progress = 100;
+
+          // Try to get actual file size if totalBytes is not available or downloadedBytes is 0
+          if (
+            !item.progress.totalBytes ||
+            item.progress.downloadedBytes === 0
+          ) {
+            try {
+              // First, try to use the filename if we have it
+              if (item.progress.filename || item.filename) {
+                const filename = item.progress.filename || item.filename;
+                const filePath = path.join(item.outputPath, filename);
+                if (fs.existsSync(filePath)) {
+                  const stats = fs.statSync(filePath);
+                  if (stats.size > 0) {
+                    item.progress.totalBytes = stats.size;
+                    item.progress.downloadedBytes = stats.size;
+                  }
+                }
+              }
+
+              // If we still don't have the size, try to find the most recently modified file
+              if (
+                !item.progress.totalBytes ||
+                item.progress.downloadedBytes === 0
+              ) {
+                const outputDir = item.outputPath;
+                if (fs.existsSync(outputDir)) {
+                  const files = fs.readdirSync(outputDir);
+                  // Find the most recently modified file (likely the downloaded file)
+                  const fileStats = files
+                    .map((file) => {
+                      const filePath = path.join(outputDir, file);
+                      try {
+                        const stats = fs.statSync(filePath);
+                        // Skip directories and very small files (likely not the video)
+                        if (stats.isFile() && stats.size > 1024) {
+                          return {
+                            path: filePath,
+                            size: stats.size,
+                            mtime: stats.mtime,
+                          };
+                        }
+                        return null;
+                      } catch {
+                        return null;
+                      }
+                    })
+                    .filter((stat) => stat !== null)
+                    .sort((a, b) => b!.mtime.getTime() - a!.mtime.getTime());
+
+                  if (fileStats.length > 0 && fileStats[0]) {
+                    const actualSize = fileStats[0].size;
+                    if (actualSize > 0) {
+                      item.progress.totalBytes = actualSize;
+                      item.progress.downloadedBytes = actualSize;
+                    }
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn("[VideoDownload] Failed to get file size:", error);
+            }
+          } else if (
+            item.progress.totalBytes &&
+            item.progress.downloadedBytes === 0
+          ) {
+            // If we have totalBytes but downloadedBytes is 0, set it to totalBytes
+            item.progress.downloadedBytes = item.progress.totalBytes;
+          }
+
           this.completedDownloads.delete(item.id);
           this.emit("complete", item);
         } else if (item.status !== DownloadStatus.CANCELLED) {
           item.status = DownloadStatus.FAILED;
           item.progress.status = DownloadStatus.FAILED;
-          this.emit("error", item, `Process exited with code ${code}`);
+
+          // Create a user-friendly error message
+          let errorMessage = `Process exited with code ${code}`;
+
+          // Use stderr messages if available
+          if (stderrMessages.length > 0) {
+            const lastError = stderrMessages[stderrMessages.length - 1];
+
+            // Extract the actual error message
+            const errorMatch = lastError.match(/ERROR:\s*(.+)/i);
+            if (errorMatch) {
+              errorMessage = errorMatch[1].trim();
+            } else {
+              // Try to find the main error line
+              const errorLines = lastError
+                .split("\n")
+                .filter(
+                  (line) =>
+                    line.includes("ERROR:") ||
+                    line.includes("Cannot parse") ||
+                    line.includes("Unsupported URL")
+                );
+              if (errorLines.length > 0) {
+                errorMessage = errorLines[0].replace(/ERROR:\s*/i, "").trim();
+              } else {
+                errorMessage = lastError.trim();
+              }
+            }
+
+            // Provide helpful suggestions for common errors
+            if (errorMessage.includes("Cannot parse data")) {
+              errorMessage = `Unable to parse video data from this source. This may be due to:\n- An outdated yt-dlp version (try updating)\n- Changes in the website structure\n- The video may be private or restricted\n\nOriginal error: ${errorMessage}`;
+            } else if (errorMessage.includes("Unsupported URL")) {
+              errorMessage = `This URL is not supported. Please check the URL and try again.\n\nOriginal error: ${errorMessage}`;
+            } else if (errorMessage.includes("Video unavailable")) {
+              errorMessage = "This video is unavailable or has been removed.";
+            }
+          }
+
+          item.error = errorMessage;
+          this.emit("error", item, errorMessage);
         }
 
         this.emit("status-changed", item);
@@ -800,9 +1078,22 @@ export class VideoDownloadService extends EventEmitter {
       eventEmitter.on("error", (error) => {
         this.activeDownloads.delete(item.id);
         item.status = DownloadStatus.FAILED;
-        item.error = error.message;
+
+        // Use stderr messages if available, otherwise use error message
+        let errorMessage = error.message;
+        if (stderrMessages.length > 0) {
+          const lastError = stderrMessages[stderrMessages.length - 1];
+          const errorMatch = lastError.match(/ERROR:\s*(.+)/i);
+          if (errorMatch) {
+            errorMessage = errorMatch[1].trim();
+          } else {
+            errorMessage = lastError.trim();
+          }
+        }
+
+        item.error = errorMessage;
         item.progress.status = DownloadStatus.FAILED;
-        this.emit("error", item, error.message);
+        this.emit("error", item, errorMessage);
         this.emit("status-changed", item);
         this.processQueue();
       });

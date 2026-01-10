@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useVideoInfo, startDownload, DownloadQuality } from "./useDownload";
 import {
   detectPlatform,
@@ -10,7 +10,7 @@ import {
 export interface UseSingleDownloadReturn {
   // State
   url: string;
-  selectedQuality: DownloadQuality;
+  selectedQuality: string;
   selectedFormat: string;
   isDownloading: boolean;
   downloadStatus: string | null;
@@ -32,7 +32,7 @@ export interface UseSingleDownloadReturn {
   handleKeyPress: (e: React.KeyboardEvent) => void;
   handleDownload: () => Promise<void>;
   handleClear: () => void;
-  setSelectedQuality: (quality: DownloadQuality) => void;
+  setSelectedQuality: (quality: string) => void;
   setSelectedFormat: (format: string) => void;
 }
 
@@ -42,7 +42,7 @@ export interface UseSingleDownloadReturn {
 export function useSingleDownload(): UseSingleDownloadReturn {
   // Local state
   const [url, setUrl] = useState("");
-  const [selectedQuality, setSelectedQuality] = useState(DownloadQuality.BEST);
+  const [selectedQuality, setSelectedQuality] = useState<string>("");
   const [selectedFormat, setSelectedFormat] = useState("mp4");
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
@@ -66,6 +66,17 @@ export function useSingleDownload(): UseSingleDownloadReturn {
   const availableQualities = useMemo(() => {
     return getAvailableQualityOptions(videoInfo);
   }, [videoInfo]);
+
+  // Set first quality as default when video info is loaded
+  useEffect(() => {
+    if (
+      availableQualities.length > 0 &&
+      (!selectedQuality ||
+        !availableQualities.find((q) => q.key === selectedQuality))
+    ) {
+      setSelectedQuality(availableQualities[0].key);
+    }
+  }, [availableQualities, selectedQuality]);
 
   // Handle URL input change
   const handleUrlChange = useCallback(
@@ -95,7 +106,7 @@ export function useSingleDownload(): UseSingleDownloadReturn {
 
   // Handle download
   const handleDownload = useCallback(async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || !selectedQuality) return;
 
     setIsDownloading(true);
     setDownloadStatus("Starting download...");
@@ -141,11 +152,12 @@ export function useSingleDownload(): UseSingleDownloadReturn {
   const handleClear = useCallback(() => {
     reset();
     setUrl("");
+    setSelectedQuality("");
     setDownloadStatus(null);
   }, [reset]);
 
   // Handle quality change with format reset
-  const handleQualityChange = useCallback((quality: DownloadQuality) => {
+  const handleQualityChange = useCallback((quality: string) => {
     console.log("[handleQualityChange] Changing quality to:", quality);
     setSelectedQuality(quality);
     // Reset format when switching to/from audio
