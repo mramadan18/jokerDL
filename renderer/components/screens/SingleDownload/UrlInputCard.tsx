@@ -1,32 +1,31 @@
 import { Input, Button, Card, CardBody, Chip } from "@heroui/react";
 import { Link2, Download } from "lucide-react";
-import { useSingleDownload } from "../../../hooks/useSingleDownload";
+interface UrlInputCardProps {
+  url: string;
+  isLoading: boolean;
+  platform: { name: string; icon: string } | null;
+  onUrlChange: (value: string) => void;
+  onFetch: () => void;
+  onKeyPress: (e: React.KeyboardEvent) => void;
+}
 
-export const UrlInputCard = () => {
-  const {
-    // State
-    url,
-
-    // Video info state
-    isLoading,
-
-    // Computed values
-    platform,
-
-    // Handlers
-    handleUrlChange,
-    handleFetch,
-    handleKeyPress,
-  } = useSingleDownload();
-
+export const UrlInputCard = ({
+  url,
+  isLoading,
+  platform,
+  onUrlChange,
+  onFetch,
+  onKeyPress,
+}: UrlInputCardProps) => {
   return (
     <Card className="p-4 mb-8 shadow-xl border-none bg-background/50 backdrop-blur-md">
-      <CardBody className="flex flex-row gap-4 items-center">
+      <CardBody className="flex flex-row gap-4 items-start">
         <Input
+          type="url"
           placeholder="Paste video URL here..."
           value={url}
-          onChange={handleUrlChange}
-          onKeyDown={handleKeyPress}
+          onValueChange={onUrlChange}
+          onKeyDown={onKeyPress}
           startContent={<Link2 className="text-violet-500" />}
           endContent={
             platform && (
@@ -46,8 +45,8 @@ export const UrlInputCard = () => {
         <Button
           size="lg"
           isLoading={isLoading}
-          isDisabled={!url.trim() || isLoading}
-          onPress={handleFetch}
+          isDisabled={!url.trim() || !url.startsWith("http") || isLoading}
+          onPress={onFetch}
           className="h-14 px-8 font-bold bg-linear-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
           endContent={!isLoading && <Download size={20} />}
         >

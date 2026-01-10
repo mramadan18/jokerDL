@@ -26,6 +26,19 @@ export interface VideoFormat {
 }
 
 /**
+ * Represents a refined quality option for the UI
+ */
+export interface QualityOption {
+  key: string;
+  label: string;
+  quality: string;
+  resolution: string;
+  totalSize: number | null;
+  videoFormat?: VideoFormat;
+  audioFormat?: VideoFormat;
+}
+
+/**
  * Thumbnail information for a video
  */
 export interface Thumbnail {
@@ -69,6 +82,7 @@ export interface VideoInfo {
   extractorKey: string;
   isLive: boolean;
   isPlaylist: boolean;
+  qualityOptions?: QualityOption[];
   playlist?: PlaylistInfo;
 }
 

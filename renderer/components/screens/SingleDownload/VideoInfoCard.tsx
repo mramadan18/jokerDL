@@ -6,26 +6,38 @@ import { QualityFormatSelectors } from "./QualityFormatSelectors";
 import { DownloadActions } from "./DownloadActions";
 import { useSingleDownload } from "../../../hooks/useSingleDownload";
 
-export const VideoInfoCard = () => {
-  const {
-    // State
-    selectedQuality,
-    selectedFormat,
-    isDownloading,
+interface VideoInfoCardProps {
+  // State
+  selectedQuality: string;
+  selectedFormat: string;
+  isDownloading: boolean;
 
-    // Video info state
-    videoInfo,
+  // Video info
+  videoInfo: any; // We'll type this properly if possible, or use the inferred type
 
-    // Computed values
-    currentFormats,
+  // Computed
+  currentFormats: Array<{ key: string; label: string }>;
+  availableQualities: Array<{ key: string; label: string }>;
 
-    // Handlers
-    handleDownload,
-    handleClear,
-    setSelectedQuality,
-    setSelectedFormat,
-  } = useSingleDownload();
+  // Handlers
+  onDownload: () => void;
+  onClear: () => void;
+  onQualityChange: (quality: any) => void;
+  onFormatChange: (format: string) => void;
+}
 
+export const VideoInfoCard = ({
+  selectedQuality,
+  selectedFormat,
+  isDownloading,
+  videoInfo,
+  currentFormats,
+  availableQualities,
+  onDownload,
+  onClear,
+  onQualityChange,
+  onFormatChange,
+}: VideoInfoCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -37,26 +49,27 @@ export const VideoInfoCard = () => {
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Thumbnail Section */}
-            <VideoThumbnail videoInfo={videoInfo} />
+            <VideoThumbnail {...videoInfo} />
 
             {/* Info & Options Section */}
             <div className="md:col-span-2 flex flex-col justify-between py-2">
-              <VideoMetadata videoInfo={videoInfo} />
+              <VideoMetadata {...videoInfo} />
 
               {/* Quality & Format Selectors */}
               <QualityFormatSelectors
                 selectedQuality={selectedQuality}
                 selectedFormat={selectedFormat}
                 currentFormats={currentFormats}
-                onQualityChange={setSelectedQuality}
-                onFormatChange={setSelectedFormat}
+                availableQualities={availableQualities}
+                onQualityChange={onQualityChange}
+                onFormatChange={onFormatChange}
               />
 
               {/* Action Buttons */}
               <DownloadActions
                 isDownloading={isDownloading}
-                onClear={handleClear}
-                onDownload={handleDownload}
+                onClear={onClear}
+                onDownload={onDownload}
               />
             </div>
           </div>
@@ -65,8 +78,9 @@ export const VideoInfoCard = () => {
           {videoInfo.formats.length > 0 && (
             <div className="mt-6 pt-4 border-t border-divider">
               <p className="text-sm text-default-400">
+                {availableQualities.length - 1} quality options available •{" "}
                 {videoInfo.formats.filter((f) => f.hasVideo).length} video
-                formats available •{" "}
+                formats •{" "}
                 {
                   videoInfo.formats.filter((f) => f.hasAudio && !f.hasVideo)
                     .length

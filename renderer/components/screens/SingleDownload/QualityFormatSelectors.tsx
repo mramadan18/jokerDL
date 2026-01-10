@@ -1,10 +1,10 @@
 import { Select, SelectItem } from "@heroui/react";
-import { QUALITY_OPTIONS } from "../../../utils/formatters";
 
 interface QualityFormatSelectorsProps {
   selectedQuality: string;
   selectedFormat: string;
   currentFormats: Array<{ key: string; label: string }>;
+  availableQualities: Array<{ key: string; label: string }>;
   onQualityChange: (quality: any) => void;
   onFormatChange: (format: string) => void;
 }
@@ -13,6 +13,7 @@ export const QualityFormatSelectors = ({
   selectedQuality,
   selectedFormat,
   currentFormats,
+  availableQualities,
   onQualityChange,
   onFormatChange,
 }: QualityFormatSelectorsProps) => {
@@ -28,7 +29,7 @@ export const QualityFormatSelectors = ({
         size="sm"
         variant="bordered"
       >
-        {QUALITY_OPTIONS.map((q) => (
+        {availableQualities.map((q) => (
           <SelectItem key={q.key} className="text-foreground">
             {q.label}
           </SelectItem>

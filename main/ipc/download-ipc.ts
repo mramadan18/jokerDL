@@ -62,7 +62,7 @@ export function initializeDownloadIpc(): void {
     DownloadIpcChannels.EXTRACT_VIDEO_INFO,
     async (_, url: string): Promise<ApiResponse<VideoInfo>> => {
       try {
-        const result = await extractVideoInfo(url);
+        const result = await videoDownloader.getVideoMetadata(url);
         return result;
       } catch (error) {
         return {
@@ -277,9 +277,8 @@ export function initializeDownloadIpc(): void {
       ApiResponse<{ path: string; version: string | null }>
     > => {
       try {
-        const info = await ensureYtDlp((progress) => {
-          sendToRenderer("download:binary-progress", progress);
-        });
+        await ensureYtDlp();
+        const info = await getBinaryInfo();
         return {
           success: true,
           data: { path: info.path, version: info.version },
@@ -302,9 +301,8 @@ export function initializeDownloadIpc(): void {
       ApiResponse<{ path: string; version: string | null }>
     > => {
       try {
-        const info = await updateYtDlp((progress) => {
-          sendToRenderer("download:binary-progress", progress);
-        });
+        await updateYtDlp();
+        const info = await getBinaryInfo();
         return {
           success: true,
           data: { path: info.path, version: info.version },

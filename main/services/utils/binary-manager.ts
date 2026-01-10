@@ -1,27 +1,12 @@
 /**
  * Binary Manager
- * Handles downloading and managing the yt-dlp executable
+ * Handles downloading and managing the yt-dlp executable using yt-dlp-wrap
  */
 
 import { app } from "electron";
-import { spawn, ChildProcess } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import * as https from "https";
-
-interface BinaryInfo {
-  path: string;
-  version: string | null;
-  lastUpdated: Date | null;
-}
-
-interface DownloadProgress {
-  downloaded: number;
-  total: number;
-  percentage: number;
-}
-
-type ProgressCallback = (progress: DownloadProgress) => void;
+import YtDlpWrap from "yt-dlp-wrap";
 
 // Platform-specific binary names
 const BINARY_NAMES: Record<string, string> = {
@@ -29,10 +14,6 @@ const BINARY_NAMES: Record<string, string> = {
   darwin: "yt-dlp_macos",
   linux: "yt-dlp",
 };
-
-// GitHub release URLs for yt-dlp
-const YTDLP_RELEASES_URL =
-  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
 
 /**
  * Get the binary storage directory
@@ -59,6 +40,13 @@ export function getYtDlpPath(): string {
 }
 
 /**
+ * Get an instance of YtDlpWrap configured with the binary path
+ */
+export function getYtDlpWrap(): YtDlpWrap {
+  return new YtDlpWrap(getYtDlpPath());
+}
+
+/**
  * Check if yt-dlp binary exists and is executable
  */
 export function isBinaryAvailable(): boolean {
@@ -82,187 +70,61 @@ export function isBinaryAvailable(): boolean {
 }
 
 /**
- * Get the current yt-dlp version
+ * Download the latest yt-dlp binary
+ */
+export async function downloadYtDlp(): Promise<void> {
+  const binaryPath = getYtDlpPath();
+  console.log(`Downloading yt-dlp to: ${binaryPath}`);
+
+  try {
+    await YtDlpWrap.downloadFromGithub(binaryPath);
+
+    // Make executable on Unix systems
+    if (process.platform !== "win32") {
+      fs.chmodSync(binaryPath, 0o755);
+    }
+
+    console.log("yt-dlp downloaded successfully");
+  } catch (error) {
+    console.error("Failed to download yt-dlp:", error);
+    throw error;
+  }
+}
+
+/**
+ * Ensure yt-dlp is available (download if needed)
+ */
+export async function ensureYtDlp(): Promise<void> {
+  if (isBinaryAvailable()) {
+    return;
+  }
+  return downloadYtDlp();
+}
+
+/**
+ * Get yt-dlp version
  */
 export async function getYtDlpVersion(): Promise<string | null> {
   if (!isBinaryAvailable()) {
     return null;
   }
-
-  return new Promise((resolve) => {
-    const binaryPath = getYtDlpPath();
-    const process = spawn(binaryPath, ["--version"]);
-    let version = "";
-
-    process.stdout.on("data", (data) => {
-      version += data.toString();
-    });
-
-    process.on("close", (code) => {
-      if (code === 0) {
-        resolve(version.trim());
-      } else {
-        resolve(null);
-      }
-    });
-
-    process.on("error", () => {
-      resolve(null);
-    });
-  });
-}
-
-/**
- * Download a file from URL with progress tracking
- */
-function downloadFile(
-  url: string,
-  destPath: string,
-  onProgress?: ProgressCallback
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(destPath);
-
-    const followRedirects = (currentUrl: string) => {
-      https
-        .get(currentUrl, (response) => {
-          // Handle redirects
-          if (response.statusCode === 301 || response.statusCode === 302) {
-            const redirectUrl = response.headers.location;
-            if (redirectUrl) {
-              followRedirects(redirectUrl);
-              return;
-            }
-          }
-
-          if (response.statusCode !== 200) {
-            reject(
-              new Error(`Failed to download: HTTP ${response.statusCode}`)
-            );
-            return;
-          }
-
-          const totalSize = parseInt(
-            response.headers["content-length"] || "0",
-            10
-          );
-          let downloadedSize = 0;
-
-          response.on("data", (chunk: Buffer) => {
-            downloadedSize += chunk.length;
-            if (onProgress && totalSize > 0) {
-              onProgress({
-                downloaded: downloadedSize,
-                total: totalSize,
-                percentage: Math.round((downloadedSize / totalSize) * 100),
-              });
-            }
-          });
-
-          response.pipe(file);
-
-          file.on("finish", () => {
-            file.close();
-            resolve();
-          });
-        })
-        .on("error", (err) => {
-          fs.unlink(destPath, () => {}); // Delete incomplete file
-          reject(err);
-        });
-    };
-
-    followRedirects(url);
-  });
-}
-
-/**
- * Download and install the yt-dlp binary
- */
-export async function downloadYtDlp(
-  onProgress?: ProgressCallback
-): Promise<BinaryInfo> {
-  const platform = process.platform;
-  const binaryName = BINARY_NAMES[platform] || "yt-dlp";
-  const downloadUrl = YTDLP_RELEASES_URL + binaryName;
-  const destPath = getYtDlpPath();
-
-  console.log(`Downloading yt-dlp from: ${downloadUrl}`);
-  console.log(`Destination: ${destPath}`);
-
-  // Download the binary
-  await downloadFile(downloadUrl, destPath, onProgress);
-
-  // Make executable on Unix systems
-  if (process.platform !== "win32") {
-    fs.chmodSync(destPath, 0o755);
+  try {
+    const wrap = getYtDlpWrap();
+    const version = await wrap.execPromise(["--version"]);
+    return version.trim();
+  } catch (error) {
+    return null;
   }
-
-  // Verify and get version
-  const version = await getYtDlpVersion();
-
-  if (!version) {
-    throw new Error("Downloaded binary is not functional");
-  }
-
-  console.log(`yt-dlp installed successfully: version ${version}`);
-
-  return {
-    path: destPath,
-    version,
-    lastUpdated: new Date(),
-  };
-}
-
-/**
- * Update yt-dlp to the latest version
- */
-export async function updateYtDlp(
-  onProgress?: ProgressCallback
-): Promise<BinaryInfo> {
-  // First try using yt-dlp's built-in update
-  if (isBinaryAvailable()) {
-    try {
-      const result = await runYtDlpSelfUpdate();
-      if (result) {
-        const version = await getYtDlpVersion();
-        return {
-          path: getYtDlpPath(),
-          version,
-          lastUpdated: new Date(),
-        };
-      }
-    } catch (error) {
-      console.log("Self-update failed, downloading fresh binary...");
-    }
-  }
-
-  // Fall back to downloading fresh binary
-  return downloadYtDlp(onProgress);
-}
-
-/**
- * Run yt-dlp's self-update command
- */
-async function runYtDlpSelfUpdate(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const binaryPath = getYtDlpPath();
-    const process = spawn(binaryPath, ["-U"]);
-
-    process.on("close", (code) => {
-      resolve(code === 0);
-    });
-
-    process.on("error", () => {
-      resolve(false);
-    });
-  });
 }
 
 /**
  * Get complete binary information
  */
-export async function getBinaryInfo(): Promise<BinaryInfo> {
+export async function getBinaryInfo(): Promise<{
+  path: string;
+  version: string | null;
+  lastUpdated: Date | null;
+}> {
   const binaryPath = getYtDlpPath();
   const exists = isBinaryAvailable();
 
@@ -285,31 +147,8 @@ export async function getBinaryInfo(): Promise<BinaryInfo> {
 }
 
 /**
- * Ensure yt-dlp is available (download if needed)
+ * Update yt-dlp to the latest version
  */
-export async function ensureYtDlp(
-  onProgress?: ProgressCallback
-): Promise<BinaryInfo> {
-  if (isBinaryAvailable()) {
-    return getBinaryInfo();
-  }
-
-  return downloadYtDlp(onProgress);
-}
-
-/**
- * Spawn a yt-dlp process with given arguments
- */
-export function spawnYtDlp(args: string[]): ChildProcess {
-  const binaryPath = getYtDlpPath();
-
-  if (!isBinaryAvailable()) {
-    throw new Error(
-      "yt-dlp binary is not available. Please download it first."
-    );
-  }
-
-  return spawn(binaryPath, args, {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+export async function updateYtDlp(): Promise<void> {
+  return downloadYtDlp();
 }

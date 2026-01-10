@@ -1,111 +1,46 @@
 /**
  * Video Download Service
- * Handles downloading videos using yt-dlp with progress tracking
+ * Handles downloading videos using yt-dlp-wrap with progress tracking
  */
 
-import { ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
 import * as path from "path";
+import * as fs from "fs";
 import {
-  spawnYtDlp,
-  isBinaryAvailable,
+  getYtDlpWrap,
   ensureYtDlp,
+  isBinaryAvailable,
 } from "../../utils/binary-manager";
 import {
-  getDefaultDownloadPath,
   getDownloadSubPath,
   sanitizeFilename,
   formatBytes,
   formatSpeed,
   formatETA,
-  generateUniqueFilename,
+  parseBytes,
 } from "../../utils/file-utils";
 import {
   VideoInfo,
   DownloadOptions,
-  DownloadProgress,
   DownloadItem,
   DownloadStatus,
   DownloadQuality,
   ApiResponse,
+  VideoFormat,
+  Thumbnail,
+  SubtitleTrack,
+  PlaylistInfo,
+  PlaylistVideoEntry,
+  QualityOption,
 } from "../types";
-
-// Regex patterns for parsing yt-dlp output
-const PATTERNS = {
-  // [download]   5.0% of 100.00MiB at 5.00MiB/s ETA 00:19
-  download:
-    /\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*(\d+\.?\d*)(KiB|MiB|GiB|B)\s+at\s+(\d+\.?\d*)(KiB|MiB|GiB|B)\/s\s+ETA\s+(\d+:\d+(?::\d+)?)/i,
-  // Alternative format: [download]  50.0% of ~   100.00MiB at    5.00MiB/s ETA 00:10 (frag 5/100)
-  downloadWithFrag:
-    /\[download\]\s+(\d+\.?\d*)%\s+of\s+~?\s*(\d+\.?\d*)(KiB|MiB|GiB|B)\s+at\s+(\d+\.?\d*)(KiB|MiB|GiB|B)\/s.*frag\s+(\d+)\/(\d+)/i,
-  // Simple percentage pattern
-  downloadAlt: /\[download\]\s+(\d+\.?\d*)%/,
-  // Size pattern: of ~  123.45MiB or of 123.45MiB
-  sizePattern: /of\s+~?\s*(\d+\.?\d*)(KiB|MiB|GiB|B)/i,
-  // Speed pattern
-  speedPattern: /at\s+(\d+\.?\d*)(KiB|MiB|GiB|B)\/s/i,
-  // ETA pattern
-  etaPattern: /ETA\s+(\d+:\d+(?::\d+)?)/i,
-  // [download] Destination: filename.mp4
-  destination: /\[download\]\s+Destination:\s+(.+)/,
-  // [Merger] Merging formats into "filename.mp4"
-  merger: /\[Merger\]\s+Merging formats into\s+"(.+)"/,
-  // [ffmpeg] Merging formats into "filename.mp4"
-  ffmpegMerge: /\[ffmpeg\]\s+Merging formats into\s+"(.+)"/,
-  // Already downloaded
-  alreadyDownloaded: /\[download\]\s+(.+) has already been downloaded/,
-  // Download completed: [download] 100% of or 100.0%
-  downloadComplete: /\[download\]\s+100(\.0)?%/,
-  // Fragment download: [download] Downloading fragment 5 of 100
-  fragment: /\[download\]\s+Downloading\s+fragment\s+(\d+)\s+of\s+(\d+)/,
-  // Deleting original file (indicates merge success)
-  deleteOriginal: /Deleting original file/,
-  // ExtractAudio or convert
-  postProcess: /\[(ExtractAudio|ffmpeg)\]/,
-};
-
-/**
- * Convert size string to bytes
- */
-function parseSize(value: number, unit: string): number {
-  const multipliers: Record<string, number> = {
-    B: 1,
-    KiB: 1024,
-    MiB: 1024 * 1024,
-    GiB: 1024 * 1024 * 1024,
-  };
-  return value * (multipliers[unit] || 1);
-}
-
-/**
- * Parse ETA string to seconds
- */
-function parseEta(etaStr: string): number {
-  const parts = etaStr.split(":").map(Number);
-  if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  } else if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
-  }
-  return 0;
-}
-
-/**
- * Generate a unique download ID
- */
-function generateDownloadId(): string {
-  return randomUUID();
-}
 
 /**
  * Download manager class for managing video downloads
  */
 export class VideoDownloadService extends EventEmitter {
-  private activeDownloads: Map<
-    string,
-    { process: ChildProcess; item: DownloadItem }
-  > = new Map();
+  private activeDownloads: Map<string, { process: any; item: DownloadItem }> =
+    new Map();
   private downloadQueue: DownloadItem[] = [];
   private maxConcurrent: number = 3;
   // Track downloads that reached 100% or completed merge
@@ -114,6 +49,276 @@ export class VideoDownloadService extends EventEmitter {
   constructor(maxConcurrent: number = 3) {
     super();
     this.maxConcurrent = maxConcurrent;
+  }
+
+  /**
+   * Get video metadata
+   */
+  async getVideoMetadata(url: string): Promise<ApiResponse<VideoInfo>> {
+    try {
+      await ensureYtDlp();
+      const ytDlp = getYtDlpWrap();
+      const metadata = await ytDlp.getVideoInfo(url);
+
+      // Map raw metadata to VideoInfo
+      const videoInfo: VideoInfo = {
+        id: metadata.id,
+        title: metadata.title,
+        description: metadata.description || null,
+        duration: metadata.duration || null,
+        durationString: metadata.duration_string || null,
+        uploader: metadata.uploader || null,
+        uploaderUrl: metadata.uploader_url || null,
+        uploadDate: metadata.upload_date || null,
+        viewCount: metadata.view_count || null,
+        likeCount: metadata.like_count || null,
+        thumbnail: metadata.thumbnail || null,
+        thumbnails: (metadata.thumbnails || []).map((t: any) => ({
+          url: t.url,
+          width: t.width,
+          height: t.height,
+          resolution: t.resolution,
+        })),
+        formats: (metadata.formats || []).map((f: any) => ({
+          formatId: f.format_id,
+          extension: f.ext,
+          resolution: f.resolution || null,
+          quality: f.quality || "",
+          filesize: f.filesize || null,
+          filesizeApprox: f.filesize_approx || null,
+          fps: f.fps || null,
+          vcodec: f.vcodec || null,
+          acodec: f.acodec || null,
+          hasVideo: f.vcodec !== "none",
+          hasAudio: f.acodec !== "none",
+          tbr: f.tbr || null,
+        })),
+        subtitles: this.mapSubtitles(metadata.subtitles),
+        webpage_url: metadata.webpage_url,
+        extractor: metadata.extractor,
+        extractorKey: metadata.extractor_key,
+        isLive: metadata.is_live || false,
+        isPlaylist: !!metadata._type && metadata._type === "playlist",
+      };
+
+      // Process and group available formats into clean quality options
+      videoInfo.qualityOptions = this.processQualityOptions(
+        videoInfo.formats,
+        videoInfo.duration
+      );
+
+      if (videoInfo.isPlaylist && metadata.entries) {
+        videoInfo.playlist = {
+          id: metadata.id,
+          title: metadata.title,
+          description: metadata.description || null,
+          uploader: metadata.uploader || null,
+          uploaderUrl: metadata.uploader_url || null,
+          thumbnail: metadata.thumbnail || null,
+          videoCount: metadata.entries.length,
+          videos: metadata.entries.map((e: any, index: number) => ({
+            id: e.id,
+            title: e.title,
+            duration: e.duration || null,
+            thumbnail: e.thumbnail || null,
+            url: e.url || e.webpage_url,
+            index: index + 1,
+          })),
+        };
+      }
+
+      return {
+        success: true,
+        data: videoInfo,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Failed to fetch metadata",
+      };
+    }
+  }
+
+  private mapSubtitles(subs: any): Record<string, SubtitleTrack[]> {
+    if (!subs) return {};
+    const result: Record<string, SubtitleTrack[]> = {};
+    for (const lang in subs) {
+      result[lang] = subs[lang].map((s: any) => ({
+        language: lang,
+        languageCode: lang,
+        url: s.url,
+        ext: s.ext,
+        isAutoGenerated: false,
+      }));
+    }
+    return result;
+  }
+
+  /**
+   * Process and group formats into clean quality options with accurate size estimation
+   */
+  private processQualityOptions(
+    formats: VideoFormat[],
+    duration: number | null
+  ): QualityOption[] {
+    // Separate streams
+    const videoOnly = formats.filter((f) => f.hasVideo && !f.hasAudio);
+    const audioOnly = formats.filter((f) => f.hasAudio && !f.hasVideo);
+    const combined = formats.filter((f) => f.hasVideo && f.hasAudio);
+
+    // Find the best audio format as a baseline for DASH streams
+    // Preference: opus (webm) > m4a > others. Then highest bitrate.
+    const bestAudio = [...audioOnly].sort((a, b) => {
+      const getAudioScore = (f: VideoFormat) => {
+        const ext = (f.extension || "").toLowerCase();
+        if (ext === "webm") return 3; // Typically opus
+        if (ext === "m4a") return 2;
+        return 1;
+      };
+      const scoreA = getAudioScore(a);
+      const scoreB = getAudioScore(b);
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return (b.tbr || 0) - (a.tbr || 0);
+    })[0];
+
+    const audioSize = bestAudio
+      ? this.calculateFormatSize(bestAudio, duration) || 0
+      : 0;
+
+    // Group video formats by resolution height
+    const groups = new Map<number, VideoFormat[]>();
+    [...videoOnly, ...combined].forEach((f) => {
+      const height = this.getHeightFromFormat(f);
+      if (!height) return;
+      if (!groups.has(height)) groups.set(height, []);
+      groups.get(height)!.push(f);
+    });
+
+    const options: QualityOption[] = [];
+
+    // For each resolution, pick the most efficient format (AV1 > VP9 > H264)
+    groups.forEach((formatsInGroup, height) => {
+      const bestVideo = formatsInGroup.sort((a, b) => {
+        // Codec preference for efficiency (Modern codecs are smaller for same quality)
+        const getCodecScore = (f: VideoFormat) => {
+          const vcodec = (f.vcodec || "").toLowerCase();
+          if (vcodec.includes("av01")) return 3; // AV1
+          if (vcodec.includes("vp9") || vcodec.includes("vp09")) return 2; // VP9
+          if (vcodec.includes("avc") || vcodec.includes("h264")) return 1; // H264
+          return 0;
+        };
+
+        const scoreA = getCodecScore(a);
+        const scoreB = getCodecScore(b);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+
+        // If same codec, prefer higher FPS
+        if ((b.fps || 0) !== (a.fps || 0)) return (b.fps || 0) - (a.fps || 0);
+
+        // If same FPS, prefer the one yt-dlp would likely pick (bitrate/tbr)
+        return (b.tbr || 0) - (a.tbr || 0);
+      })[0];
+
+      const videoSize = this.calculateFormatSize(bestVideo, duration) || 0;
+      // If it's a combined format, don't add audioSize. If it's video-only, add best audio size.
+      const totalSize = bestVideo.hasAudio ? videoSize : videoSize + audioSize;
+
+      options.push({
+        key: `${height}p`,
+        label: this.getQualityLabel(height),
+        quality: `${height}p`,
+        resolution: bestVideo.resolution || `${height}p`,
+        totalSize: totalSize > 0 ? totalSize : null,
+        videoFormat: bestVideo,
+        audioFormat: bestVideo.hasAudio ? undefined : bestAudio,
+      });
+    });
+
+    // Add Audio Only option
+    if (bestAudio) {
+      options.push({
+        key: "bestaudio",
+        label: "Audio Only",
+        quality: "audio",
+        resolution: "audio",
+        totalSize: audioSize > 0 ? audioSize : null,
+        audioFormat: bestAudio,
+      });
+    }
+
+    // Sort options by resolution descending (highest quality first)
+    const sortedOptions = options.sort((a, b) => {
+      const getRes = (key: string) => parseInt(key) || 0;
+      const resA = getRes(a.key);
+      const resB = getRes(b.key);
+      if (resA !== resB) return resB - resA;
+      return a.key === "bestaudio" ? 1 : -1;
+    });
+
+    // Add "Best Quality" auto option at the very top
+    if (sortedOptions.length > 0 && sortedOptions[0].key !== "bestaudio") {
+      const best = sortedOptions[0];
+      sortedOptions.unshift({
+        ...best,
+        key: "best",
+        label: "Best Quality (Auto)",
+      });
+    }
+
+    return sortedOptions;
+  }
+
+  /**
+   * Calculate approximate file size in bytes
+   */
+  private calculateFormatSize(
+    format: VideoFormat,
+    duration: number | null
+  ): number | null {
+    if (format.filesize) return format.filesize;
+    if (format.filesizeApprox) return format.filesizeApprox;
+
+    // Fallback: tbr (kbps) * duration (s) / 8
+    if (format.tbr && duration) {
+      return Math.round((format.tbr * 1024 * duration) / 8);
+    }
+
+    return null;
+  }
+
+  /**
+   * Helper to extract numeric height from resolution string or format
+   */
+  private getHeightFromFormat(format: VideoFormat): number | null {
+    // Try resolution string first (e.g., "1920x1080")
+    if (format.resolution) {
+      const match = format.resolution.match(/(\d+)p/);
+      if (match) return parseInt(match[1]);
+      const resMatch = format.resolution.match(/x(\d+)/);
+      if (resMatch) return parseInt(resMatch[1]);
+    }
+
+    // Try quality field (e.g., "1080p")
+    if (format.quality) {
+      const match = format.quality.match(/(\d+)p/);
+      if (match) return parseInt(match[1]);
+    }
+
+    return null;
+  }
+
+  /**
+   * Get human readable label for quality
+   */
+  private getQualityLabel(height: number): string {
+    if (height >= 2160) return "4K (2160p)";
+    if (height >= 1440) return "2K (1440p)";
+    if (height >= 1080) return "Full HD (1080p)";
+    if (height >= 720) return "HD (720p)";
+    if (height >= 480) return "SD (480p)";
+    if (height >= 360) return "Low (360p)";
+    return `${height}p`;
   }
 
   /**
@@ -126,7 +331,6 @@ export class VideoDownloadService extends EventEmitter {
     const args: string[] = [
       "--no-warnings",
       "--newline", // Important for progress parsing
-      "--progress",
       "-o",
       outputFilePath,
     ];
@@ -238,7 +442,7 @@ export class VideoDownloadService extends EventEmitter {
     }
 
     // Create download item
-    const downloadId = generateDownloadId();
+    const downloadId = randomUUID();
     const outputDir = options.outputPath || getDownloadSubPath("videos");
 
     // Generate filename
@@ -330,7 +534,7 @@ export class VideoDownloadService extends EventEmitter {
   }
 
   /**
-   * Execute a download
+   * Execute a download using yt-dlp-wrap
    */
   private async executeDownload(item: DownloadItem): Promise<void> {
     // Update status
@@ -348,212 +552,102 @@ export class VideoDownloadService extends EventEmitter {
     const args = this.buildArgs(item.options, outputFilePath);
 
     try {
-      const process = spawnYtDlp(args);
+      const ytDlpWrap = getYtDlpWrap();
+      const eventEmitter = ytDlpWrap.exec(args);
 
-      this.activeDownloads.set(item.id, { process, item });
-
-      // Handle stdout (progress)
-      process.stdout?.on("data", (data) => {
-        this.parseProgress(item, data.toString());
+      this.activeDownloads.set(item.id, {
+        process: eventEmitter.ytDlpProcess,
+        item,
       });
 
-      // Handle stderr
-      process.stderr?.on("data", (data) => {
-        const stderr = data.toString();
-        console.log("yt-dlp stderr:", stderr);
+      // Handle Progress
+      eventEmitter.on("progress", (progress) => {
+        item.progress.progress = progress.percent;
 
-        // Check for errors
-        if (stderr.includes("ERROR")) {
-          item.error = stderr;
+        if (progress.totalSize) {
+          item.progress.totalBytes =
+            typeof progress.totalSize === "string"
+              ? parseBytes(progress.totalSize)
+              : progress.totalSize;
+        }
+
+        // Calculate downloaded bytes if total bytes is available
+        if (item.progress.totalBytes) {
+          item.progress.downloadedBytes =
+            (item.progress.progress / 100) * item.progress.totalBytes;
+        }
+
+        item.progress.speedString = progress.currentSpeed;
+        item.progress.etaString = progress.eta;
+
+        this.emit("progress", item.progress);
+      });
+
+      // Handle Events (to detect filename, merging, etc)
+      eventEmitter.on("ytDlpEvent", (eventType, eventData) => {
+        // console.log(eventType, eventData);
+        if (
+          eventType === "youtube-dl" &&
+          eventData.includes("[download] Destination:")
+        ) {
+          const match = eventData.match(/Destination:\s+(.+)/);
+          if (match) {
+            item.progress.filename = path.basename(match[1]);
+            item.filename = item.progress.filename;
+          }
+        }
+
+        if (
+          eventData.includes("[Merger]") ||
+          eventData.includes("Merging formats")
+        ) {
+          item.status = DownloadStatus.MERGING;
+          item.progress.status = DownloadStatus.MERGING;
+          this.completedDownloads.add(item.id);
+          this.emit("status-changed", item);
         }
       });
 
-      // Handle process close
-      process.on("close", (code) => {
+      eventEmitter.on("close", (code) => {
         this.activeDownloads.delete(item.id);
 
-        // Check if download reached 100% (even if exit code is non-zero)
-        const reachedCompletion = this.completedDownloads.has(item.id);
+        const reachedCompletion =
+          this.completedDownloads.has(item.id) ||
+          item.progress.progress === 100;
 
         if (code === 0 || reachedCompletion) {
           item.status = DownloadStatus.COMPLETED;
           item.completedAt = new Date();
           item.progress.status = DownloadStatus.COMPLETED;
           item.progress.progress = 100;
-
-          // Ensure downloadedBytes matches totalBytes at completion
-          if (item.progress.totalBytes) {
-            item.progress.downloadedBytes = item.progress.totalBytes;
-          }
-
-          // Clean up tracking
           this.completedDownloads.delete(item.id);
-
           this.emit("complete", item);
         } else if (item.status !== DownloadStatus.CANCELLED) {
           item.status = DownloadStatus.FAILED;
           item.progress.status = DownloadStatus.FAILED;
-
-          this.emit(
-            "error",
-            item,
-            item.error || `Process exited with code ${code}`
-          );
+          this.emit("error", item, `Process exited with code ${code}`);
         }
 
         this.emit("status-changed", item);
-
-        // Process next in queue
         this.processQueue();
       });
 
-      process.on("error", (error) => {
+      eventEmitter.on("error", (error) => {
         this.activeDownloads.delete(item.id);
-
         item.status = DownloadStatus.FAILED;
         item.error = error.message;
         item.progress.status = DownloadStatus.FAILED;
-
         this.emit("error", item, error.message);
         this.emit("status-changed", item);
-
-        // Process next in queue
         this.processQueue();
       });
     } catch (error) {
       item.status = DownloadStatus.FAILED;
       item.error = error instanceof Error ? error.message : "Unknown error";
       item.progress.status = DownloadStatus.FAILED;
-
       this.emit("error", item, item.error);
       this.emit("status-changed", item);
-
       this.processQueue();
-    }
-  }
-
-  /**
-   * Parse yt-dlp output for progress information
-   */
-  private parseProgress(item: DownloadItem, output: string): void {
-    const lines = output.split("\n");
-
-    for (const line of lines) {
-      // Check for destination filename
-      const destMatch = line.match(PATTERNS.destination);
-      if (destMatch) {
-        item.progress.filename = path.basename(destMatch[1]);
-        item.filename = item.progress.filename;
-      }
-
-      // Check for merger (indicates video+audio merge, almost done)
-      const mergerMatch =
-        line.match(PATTERNS.merger) || line.match(PATTERNS.ffmpegMerge);
-      if (mergerMatch) {
-        item.status = DownloadStatus.MERGING;
-        item.progress.status = DownloadStatus.MERGING;
-        // Mark as completed when merge starts (it will finish)
-        this.completedDownloads.add(item.id);
-        this.emit("status-changed", item);
-      }
-
-      // Check for post-processing (ffmpeg, ExtractAudio)
-      if (line.match(PATTERNS.postProcess)) {
-        // Mark as completed when post-processing starts
-        this.completedDownloads.add(item.id);
-      }
-
-      // Check for deleting original (means merge succeeded)
-      if (line.match(PATTERNS.deleteOriginal)) {
-        this.completedDownloads.add(item.id);
-      }
-
-      // Check for fragment download
-      const fragmentMatch = line.match(PATTERNS.fragment);
-      if (fragmentMatch) {
-        item.progress.currentFragment = parseInt(fragmentMatch[1]);
-        item.progress.totalFragments = parseInt(fragmentMatch[2]);
-      }
-
-      // Check for download progress - try full pattern first
-      const downloadMatch = line.match(PATTERNS.download);
-      if (downloadMatch) {
-        const [, percent, size, sizeUnit, speed, speedUnit, eta] =
-          downloadMatch;
-
-        const totalBytes = parseSize(parseFloat(size), sizeUnit);
-        const percentNum = parseFloat(percent);
-        const downloadedBytes = totalBytes * (percentNum / 100);
-        const speedBytes = parseSize(parseFloat(speed), speedUnit);
-        const etaSeconds = parseEta(eta);
-
-        item.progress.progress = percentNum;
-        item.progress.totalBytes = totalBytes;
-        item.progress.downloadedBytes = downloadedBytes;
-        item.progress.speed = speedBytes;
-        item.progress.speedString = formatSpeed(speedBytes);
-        item.progress.eta = etaSeconds;
-        item.progress.etaString = formatETA(etaSeconds);
-
-        this.emit("progress", item.progress);
-      } else {
-        // Try to extract parts separately for more flexibility
-        const altMatch = line.match(PATTERNS.downloadAlt);
-        if (altMatch) {
-          const percentNum = parseFloat(altMatch[1]);
-          item.progress.progress = percentNum;
-
-          // Try to get size separately
-          const sizeMatch = line.match(PATTERNS.sizePattern);
-          if (sizeMatch) {
-            const totalBytes = parseSize(
-              parseFloat(sizeMatch[1]),
-              sizeMatch[2]
-            );
-            item.progress.totalBytes = totalBytes;
-            item.progress.downloadedBytes = totalBytes * (percentNum / 100);
-          }
-
-          // Try to get speed separately
-          const speedMatch = line.match(PATTERNS.speedPattern);
-          if (speedMatch) {
-            const speedBytes = parseSize(
-              parseFloat(speedMatch[1]),
-              speedMatch[2]
-            );
-            item.progress.speed = speedBytes;
-            item.progress.speedString = formatSpeed(speedBytes);
-          }
-
-          // Try to get ETA separately
-          const etaMatch = line.match(PATTERNS.etaPattern);
-          if (etaMatch) {
-            const etaSeconds = parseEta(etaMatch[1]);
-            item.progress.eta = etaSeconds;
-            item.progress.etaString = formatETA(etaSeconds);
-          }
-
-          this.emit("progress", item.progress);
-        }
-      }
-
-      // Check for completion (100%)
-      if (line.match(PATTERNS.downloadComplete)) {
-        item.progress.progress = 100;
-        // Mark as completed
-        this.completedDownloads.add(item.id);
-        this.emit("progress", item.progress);
-      }
-
-      // Check for already downloaded
-      const alreadyMatch = line.match(PATTERNS.alreadyDownloaded);
-      if (alreadyMatch) {
-        item.progress.progress = 100;
-        item.progress.filename = path.basename(alreadyMatch[1]);
-        // Mark as completed
-        this.completedDownloads.add(item.id);
-        this.emit("progress", item.progress);
-      }
     }
   }
 
@@ -564,6 +658,7 @@ export class VideoDownloadService extends EventEmitter {
     const download = this.activeDownloads.get(downloadId);
     if (!download) return false;
 
+    // Use SIGTERM or SIGINT
     download.process.kill("SIGTERM");
     download.item.status = DownloadStatus.PAUSED;
     download.item.progress.status = DownloadStatus.PAUSED;

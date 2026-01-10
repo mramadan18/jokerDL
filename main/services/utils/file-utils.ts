@@ -275,3 +275,38 @@ export function openFile(filePath: string): void {
   const { shell } = require("electron");
   shell.openPath(filePath);
 }
+
+/**
+ * Parse size string (e.g. "10.5 MiB") to bytes
+ */
+export function parseBytes(sizeStr: string): number {
+  if (!sizeStr) return 0;
+
+  // Clean whitespace
+  sizeStr = sizeStr.trim();
+
+  // Extract number and unit
+  const match = sizeStr.match(/^([\d.]+)\s*([a-zA-Z]+)$/);
+  if (!match) return 0;
+
+  const value = parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
+
+  const multipliers: Record<string, number> = {
+    b: 1,
+    k: 1024,
+    kb: 1024,
+    kib: 1024,
+    m: 1024 * 1024,
+    mb: 1024 * 1024,
+    mib: 1024 * 1024,
+    g: 1024 * 1024 * 1024,
+    gb: 1024 * 1024 * 1024,
+    gib: 1024 * 1024 * 1024,
+    t: 1024 * 1024 * 1024 * 1024,
+    tb: 1024 * 1024 * 1024 * 1024,
+    tib: 1024 * 1024 * 1024 * 1024,
+  };
+
+  return value * (multipliers[unit] || 1);
+}

@@ -1,5 +1,5 @@
 import { DownloadQuality } from "../hooks/useDownload";
-import { PLATFORMS } from "../types/download";
+import { PLATFORMS, VideoFormat, VideoInfo } from "../types/download";
 
 /**
  * Format bytes to human-readable string
@@ -55,6 +55,138 @@ export function detectPlatform(
     // Invalid URL
   }
   return null;
+}
+
+/**
+ * Extract available quality options from video formats
+ */
+export function getAvailableQualityOptions(
+  videoInfo: VideoInfo | null
+): Array<{ key: string; label: string; filesize?: string }> {
+  if (!videoInfo) {
+    return QUALITY_OPTIONS;
+  }
+
+  // Use pre-calculated quality options from the service if available
+  if (videoInfo.qualityOptions && videoInfo.qualityOptions.length > 0) {
+    return videoInfo.qualityOptions.map((opt) => ({
+      key: opt.key,
+      label: opt.totalSize
+        ? `${opt.label} (${formatBytes(opt.totalSize)})`
+        : opt.label,
+    }));
+  }
+
+  // Fallback to legacy calculation if qualityOptions are missing
+  if (!videoInfo.formats || videoInfo.formats.length === 0) {
+    return QUALITY_OPTIONS;
+  }
+
+  const availableQualities = new Map<
+    string,
+    { key: string; label: string; filesize: number | null }
+  >();
+
+  // Always add "Best Quality" option
+  availableQualities.set(DownloadQuality.BEST, {
+    key: DownloadQuality.BEST,
+    label: "Best Quality (Auto)",
+    filesize: null,
+  });
+
+  // Group formats by resolution and find the best filesize for each
+  const resolutionMap = new Map<string, VideoFormat>();
+
+  videoInfo.formats.forEach((format) => {
+    if (!format.hasVideo) return; // Skip audio-only formats
+
+    const resolution = format.resolution;
+    if (!resolution) return;
+
+    const resolutionNum = parseInt(resolution.replace("p", ""));
+    if (isNaN(resolutionNum)) return;
+
+    // Map resolution to quality key
+    let qualityKey: string | null = null;
+    let qualityLabel: string | null = null;
+
+    if (resolutionNum >= 2160) {
+      qualityKey = DownloadQuality.QUALITY_4K;
+      qualityLabel = "4K (2160p)";
+    } else if (resolutionNum >= 1440) {
+      qualityKey = DownloadQuality.QUALITY_1440P;
+      qualityLabel = "2K (1440p)";
+    } else if (resolutionNum >= 1080) {
+      qualityKey = DownloadQuality.QUALITY_1080P;
+      qualityLabel = "Full HD (1080p)";
+    } else if (resolutionNum >= 720) {
+      qualityKey = DownloadQuality.QUALITY_720P;
+      qualityLabel = "HD (720p)";
+    } else if (resolutionNum >= 480) {
+      qualityKey = DownloadQuality.QUALITY_480P;
+      qualityLabel = "SD (480p)";
+    } else if (resolutionNum >= 360) {
+      qualityKey = DownloadQuality.QUALITY_360P;
+      qualityLabel = "Low (360p)";
+    }
+
+    if (!qualityKey || !qualityLabel) return;
+
+    // Keep the format with the largest filesize for each quality
+    const existing = resolutionMap.get(qualityKey);
+    const currentSize = format.filesize || format.filesizeApprox || 0;
+    const existingSize = existing?.filesize || existing?.filesizeApprox || 0;
+
+    if (!existing || currentSize > existingSize) {
+      resolutionMap.set(qualityKey, format);
+      availableQualities.set(qualityKey, {
+        key: qualityKey,
+        label: qualityLabel,
+        filesize: format.filesize || format.filesizeApprox,
+      });
+    }
+  });
+
+  // Check if audio-only formats are available
+  const hasAudioFormats = videoInfo.formats.some(
+    (f) => f.hasAudio && !f.hasVideo
+  );
+  if (hasAudioFormats) {
+    const audioFormat = videoInfo.formats.find(
+      (f) => f.hasAudio && !f.hasVideo
+    );
+    availableQualities.set(DownloadQuality.AUDIO_ONLY, {
+      key: DownloadQuality.AUDIO_ONLY,
+      label: "Audio Only",
+      filesize: audioFormat?.filesize || audioFormat?.filesizeApprox || null,
+    });
+  }
+
+  // Convert to array and sort by quality (highest first)
+  const qualityOrder = [
+    DownloadQuality.BEST,
+    DownloadQuality.QUALITY_4K,
+    DownloadQuality.QUALITY_1440P,
+    DownloadQuality.QUALITY_1080P,
+    DownloadQuality.QUALITY_720P,
+    DownloadQuality.QUALITY_480P,
+    DownloadQuality.QUALITY_360P,
+    DownloadQuality.AUDIO_ONLY,
+  ];
+
+  const result = qualityOrder
+    .filter((key) => availableQualities.has(key))
+    .map((key) => {
+      const quality = availableQualities.get(key)!;
+      return {
+        key: quality.key,
+        label: quality.filesize
+          ? `${quality.label} (${formatBytes(quality.filesize)})`
+          : quality.label,
+      };
+    });
+
+  return result.length > 0 ? result : QUALITY_OPTIONS;
 }
 
 /**

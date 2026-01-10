@@ -4,6 +4,7 @@ import {
   detectPlatform,
   AUDIO_FORMAT_OPTIONS,
   FORMAT_OPTIONS,
+  getAvailableQualityOptions,
 } from "../utils/formatters";
 
 export interface UseSingleDownloadReturn {
@@ -23,9 +24,10 @@ export interface UseSingleDownloadReturn {
   platform: { name: string; icon: string } | null;
   isAudioOnly: boolean;
   currentFormats: Array<{ key: string; label: string }>;
+  availableQualities: Array<{ key: string; label: string }>;
 
   // Handlers
-  handleUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleUrlChange: (value: string) => void;
   handleFetch: () => Promise<void>;
   handleKeyPress: (e: React.KeyboardEvent) => void;
   handleDownload: () => Promise<void>;
@@ -61,10 +63,13 @@ export function useSingleDownload(): UseSingleDownloadReturn {
     return isAudioOnly ? AUDIO_FORMAT_OPTIONS : FORMAT_OPTIONS;
   }, [isAudioOnly]);
 
+  const availableQualities = useMemo(() => {
+    return getAvailableQualityOptions(videoInfo);
+  }, [videoInfo]);
+
   // Handle URL input change
   const handleUrlChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
+    (value: string) => {
       setUrl(value);
       reset();
       setDownloadStatus(null);
@@ -157,6 +162,7 @@ export function useSingleDownload(): UseSingleDownloadReturn {
     platform,
     isAudioOnly,
     currentFormats,
+    availableQualities,
 
     // Handlers
     handleUrlChange,

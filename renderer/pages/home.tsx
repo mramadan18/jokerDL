@@ -10,12 +10,30 @@ import {
 const HomePage = () => {
   const {
     // State
+    url,
+    selectedQuality,
+    selectedFormat,
+    isDownloading,
     downloadStatus,
 
     // Video info state
     videoInfo,
     isLoading,
     error,
+
+    // Computed values
+    platform,
+    currentFormats,
+    availableQualities,
+
+    // Handlers
+    handleUrlChange,
+    handleFetch,
+    handleKeyPress,
+    handleDownload,
+    handleClear,
+    setSelectedQuality,
+    setSelectedFormat,
   } = useSingleDownload();
 
   return (
@@ -32,7 +50,14 @@ const HomePage = () => {
       </div>
 
       {/* URL Input Card */}
-      <UrlInputCard />
+      <UrlInputCard
+        url={url}
+        isLoading={isLoading}
+        platform={platform}
+        onUrlChange={handleUrlChange}
+        onFetch={handleFetch}
+        onKeyPress={handleKeyPress}
+      />
 
       {/* Error Message */}
       <AnimatePresence>
@@ -50,7 +75,22 @@ const HomePage = () => {
       </AnimatePresence>
 
       {/* Video Info Card */}
-      <AnimatePresence>{videoInfo && <VideoInfoCard />}</AnimatePresence>
+      <AnimatePresence>
+        {videoInfo && (
+          <VideoInfoCard
+            selectedQuality={selectedQuality}
+            selectedFormat={selectedFormat}
+            isDownloading={isDownloading}
+            videoInfo={videoInfo}
+            currentFormats={currentFormats}
+            availableQualities={availableQualities}
+            onDownload={handleDownload}
+            onClear={handleClear}
+            onQualityChange={setSelectedQuality}
+            onFormatChange={setSelectedFormat}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Supported Platforms Info */}
       {!videoInfo && !isLoading && !error && <SupportedPlatforms />}
