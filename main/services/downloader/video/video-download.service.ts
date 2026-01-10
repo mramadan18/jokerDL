@@ -83,7 +83,7 @@ export class VideoDownloadService extends EventEmitter {
           formatId: f.format_id,
           extension: f.ext,
           resolution: f.resolution || null,
-          quality: f.quality || "",
+          quality: f.quality ? String(f.quality) : "",
           filesize: f.filesize || null,
           filesizeApprox: f.filesize_approx || null,
           fps: f.fps || null,
@@ -301,7 +301,9 @@ export class VideoDownloadService extends EventEmitter {
 
     // Try quality field (e.g., "1080p")
     if (format.quality) {
-      const match = format.quality.match(/(\d+)p/);
+      // Convert to string in case it's a number (e.g., from Facebook)
+      const qualityStr = String(format.quality);
+      const match = qualityStr.match(/(\d+)p/);
       if (match) return parseInt(match[1]);
     }
 
