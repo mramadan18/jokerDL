@@ -103,6 +103,16 @@ export function useSingleDownload(): UseSingleDownloadReturn {
     try {
       const isAudioOnly = selectedQuality === DownloadQuality.AUDIO_ONLY;
 
+      console.log("[handleDownload] selectedQuality:", selectedQuality);
+      console.log(
+        "[handleDownload] videoInfo?.qualityOptions:",
+        videoInfo?.qualityOptions?.map((q) => ({
+          key: q.key,
+          videoFormatId: q.videoFormat?.formatId,
+          audioFormatId: q.audioFormat?.formatId,
+        }))
+      );
+
       const result = await startDownload(videoInfo, {
         url: url.trim(),
         outputPath: "", // Will use default
@@ -136,6 +146,7 @@ export function useSingleDownload(): UseSingleDownloadReturn {
 
   // Handle quality change with format reset
   const handleQualityChange = useCallback((quality: DownloadQuality) => {
+    console.log("[handleQualityChange] Changing quality to:", quality);
     setSelectedQuality(quality);
     // Reset format when switching to/from audio
     if (quality === DownloadQuality.AUDIO_ONLY) {

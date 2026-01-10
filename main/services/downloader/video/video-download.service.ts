@@ -11,6 +11,8 @@ import {
   getYtDlpWrap,
   ensureYtDlp,
   isBinaryAvailable,
+  getFfmpegPath,
+  isFfmpegAvailable,
 } from "../../utils/binary-manager";
 import {
   getDownloadSubPath,
@@ -197,9 +199,17 @@ export class VideoDownloadService extends EventEmitter {
 
     const options: QualityOption[] = [];
 
-    // For each resolution, pick the most efficient format (AV1 > VP9 > H264)
+    // For each resolution, prefer combined formats first, then pick the most efficient format
     groups.forEach((formatsInGroup, height) => {
-      const bestVideo = formatsInGroup.sort((a, b) => {
+      // First, try to find a combined format (video + audio together)
+      const combinedFormats = formatsInGroup.filter((f) => f.hasAudio);
+      const videoOnlyFormats = formatsInGroup.filter((f) => !f.hasAudio);
+
+      // Prefer combined formats to avoid need for merging
+      const formatsToSort =
+        combinedFormats.length > 0 ? combinedFormats : videoOnlyFormats;
+
+      const bestVideo = formatsToSort.sort((a, b) => {
         // Codec preference for efficiency (Modern codecs are smaller for same quality)
         const getCodecScore = (f: VideoFormat) => {
           const vcodec = (f.vcodec || "").toLowerCase();
@@ -328,11 +338,13 @@ export class VideoDownloadService extends EventEmitter {
    */
   private buildArgs(
     options: DownloadOptions,
-    outputFilePath: string
+    outputFilePath: string,
+    videoInfo?: VideoInfo | null
   ): string[] {
     const args: string[] = [
       "--no-warnings",
       "--newline", // Important for progress parsing
+      "--restrict-filenames", // Restrict filenames to ASCII only, avoid special chars
       "-o",
       outputFilePath,
     ];
@@ -344,35 +356,142 @@ export class VideoDownloadService extends EventEmitter {
       if (options.format) {
         args.push("--audio-format", options.format);
       }
-    } else if (options.format) {
-      args.push("-f", options.format);
     } else if (options.quality) {
-      const qualityMap: Record<string, string> = {
-        [DownloadQuality.BEST]:
-          "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        [DownloadQuality.BEST_VIDEO]: "bestvideo+bestaudio/best",
-        [DownloadQuality.QUALITY_4K]:
-          "bestvideo[height<=2160]+bestaudio/best[height<=2160]",
-        [DownloadQuality.QUALITY_1440P]:
-          "bestvideo[height<=1440]+bestaudio/best[height<=1440]",
-        [DownloadQuality.QUALITY_1080P]:
-          "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-        [DownloadQuality.QUALITY_720P]:
-          "bestvideo[height<=720]+bestaudio/best[height<=720]",
-        [DownloadQuality.QUALITY_480P]:
-          "bestvideo[height<=480]+bestaudio/best[height<=480]",
-        [DownloadQuality.QUALITY_360P]:
-          "bestvideo[height<=360]+bestaudio/best[height<=360]",
-        [DownloadQuality.AUDIO_ONLY]: "bestaudio",
-      };
-      const formatSelector = qualityMap[options.quality] || options.quality;
+      // First, try to find the quality option from videoInfo.qualityOptions
+      let formatSelector: string | null = null;
+
+      console.log("[buildArgs] options.quality:", options.quality);
+      console.log(
+        "[buildArgs] videoInfo?.qualityOptions:",
+        videoInfo?.qualityOptions?.map((q) => ({
+          key: q.key,
+          videoFormatId: q.videoFormat?.formatId,
+          audioFormatId: q.audioFormat?.formatId,
+        }))
+      );
+
+      if (videoInfo?.qualityOptions) {
+        const qualityOption = videoInfo.qualityOptions.find(
+          (opt) => opt.key === options.quality
+        );
+
+        console.log(
+          "[buildArgs] Found qualityOption:",
+          qualityOption
+            ? {
+                key: qualityOption.key,
+                videoFormatId: qualityOption.videoFormat?.formatId,
+                audioFormatId: qualityOption.audioFormat?.formatId,
+              }
+            : null
+        );
+
+        if (qualityOption) {
+          // Build format selector from the quality option
+          if (qualityOption.key === "best") {
+            // Prefer h264 (avc1) codec for maximum compatibility
+            // Some platforms use HEVC/VP9 which don't play on all players
+            formatSelector =
+              "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best";
+          } else if (qualityOption.key === "bestaudio") {
+            formatSelector = "bestaudio";
+          } else if (qualityOption.videoFormat && qualityOption.audioFormat) {
+            // DASH streams (YouTube, Vimeo, Facebook, etc.): video + audio separate
+            // Use format IDs with fallback to ensure format is available
+            const height = this.getHeightFromFormat(qualityOption.videoFormat);
+            const videoId = qualityOption.videoFormat.formatId;
+            const audioId = qualityOption.audioFormat.formatId;
+
+            // Build format selector with fallback chain:
+            // 1. Try exact format IDs first
+            // 2. Fallback to h264 codec at same height (most compatible)
+            // 3. Fallback to any codec at same height
+            // 4. Fallback to best available
+            if (height) {
+              formatSelector = `${videoId}+${audioId}/bestvideo[vcodec^=avc1][height<=${height}]+bestaudio/bestvideo[height<=${height}]+bestaudio/best[height<=${height}]/best`;
+            } else {
+              formatSelector = `${videoId}+${audioId}/bestvideo[vcodec^=avc1]+bestaudio/bestvideo+bestaudio/best`;
+            }
+
+            console.log("[buildArgs] Using DASH streams with fallback");
+            console.log(`[buildArgs] Format selector: ${formatSelector}`);
+          } else if (qualityOption.videoFormat) {
+            // Combined formats (TikTok, Instagram, Facebook, Twitter, etc.)
+            // Video and audio are together in one stream
+            if (qualityOption.videoFormat.hasAudio) {
+              // Combined format - use just the formatId
+              // This ensures we get exactly the selected quality
+              formatSelector = qualityOption.videoFormat.formatId;
+            } else {
+              // Video-only format (rare case) - add best audio as fallback
+              formatSelector = `${qualityOption.videoFormat.formatId}+bestaudio`;
+            }
+          }
+        }
+      }
+
+      console.log("[buildArgs] Final formatSelector:", formatSelector);
+
+      // Fallback to qualityMap if formatSelector not found
+      // All selectors prefer h264 (avc1) codec for maximum compatibility
+      if (!formatSelector) {
+        const qualityMap: Record<string, string> = {
+          [DownloadQuality.BEST]:
+            "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+          [DownloadQuality.BEST_VIDEO]:
+            "bestvideo[vcodec^=avc1]+bestaudio/bestvideo+bestaudio/best",
+          [DownloadQuality.QUALITY_4K]:
+            "bestvideo[vcodec^=avc1][height<=2160]+bestaudio/bestvideo[height<=2160]+bestaudio/best[height<=2160]",
+          [DownloadQuality.QUALITY_1440P]:
+            "bestvideo[vcodec^=avc1][height<=1440]+bestaudio/bestvideo[height<=1440]+bestaudio/best[height<=1440]",
+          [DownloadQuality.QUALITY_1080P]:
+            "bestvideo[vcodec^=avc1][height<=1080]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+          [DownloadQuality.QUALITY_720P]:
+            "bestvideo[vcodec^=avc1][height<=720]+bestaudio/bestvideo[height<=720]+bestaudio/best[height<=720]",
+          [DownloadQuality.QUALITY_480P]:
+            "bestvideo[vcodec^=avc1][height<=480]+bestaudio/bestvideo[height<=480]+bestaudio/best[height<=480]",
+          [DownloadQuality.QUALITY_360P]:
+            "bestvideo[vcodec^=avc1][height<=360]+bestaudio/bestvideo[height<=360]+bestaudio/best[height<=360]",
+          [DownloadQuality.AUDIO_ONLY]: "bestaudio",
+        };
+        formatSelector = qualityMap[options.quality] || options.quality;
+      }
+
       args.push("-f", formatSelector);
+    } else {
+      // Default to best quality if no quality specified
+      args.push(
+        "-f",
+        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+      );
     }
 
     // Merge format for video+audio
+    // CRITICAL: yt-dlp requires ffmpeg to merge video and audio streams
     if (!options.audioOnly) {
+      // Add ffmpeg location if available - REQUIRED for merging DASH streams
+      const ffmpegLocation = getFfmpegPath();
+      if (ffmpegLocation && isFfmpegAvailable()) {
+        args.push("--ffmpeg-location", ffmpegLocation);
+        console.log("[buildArgs] Using ffmpeg at:", ffmpegLocation);
+      } else {
+        console.warn(
+          "[buildArgs] WARNING: ffmpeg not available, merging may fail!"
+        );
+      }
+
+      // Specify output format (container)
       args.push("--merge-output-format", options.format || "mp4");
+
+      // Remove intermediate files after successful merge
+      args.push("--no-keep-video");
+
+      // Just copy streams without re-encoding (fast)
+      // Format selector already prefers h264 compatible formats
+      args.push("--postprocessor-args", "ffmpeg:-c copy");
     }
+
+    console.log("[buildArgs] Final args:", args.join(" "));
 
     // Subtitles
     if (options.subtitles?.download) {
@@ -447,19 +566,31 @@ export class VideoDownloadService extends EventEmitter {
     const downloadId = randomUUID();
     const outputDir = options.outputPath || getDownloadSubPath("videos");
 
-    // Generate filename
-    let filename = options.filename;
-    if (!filename && videoInfo) {
-      const ext = options.audioOnly
-        ? options.format || "mp3"
-        : options.format || "mp4";
-      filename = sanitizeFilename(videoInfo.title) + "." + ext;
-    }
-    if (!filename) {
-      filename = "%(title)s.%(ext)s"; // Let yt-dlp handle it
+    // Ensure output directory exists (double-check)
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    const outputFilePath = path.join(outputDir, filename);
+    // Generate filename template
+    // Always use yt-dlp template to avoid path length issues and let yt-dlp handle sanitization
+    let filenameTemplate: string;
+    if (options.filename && !options.filename.includes("%")) {
+      // User provided a specific filename - sanitize it
+      const sanitized = sanitizeFilename(options.filename, 200);
+      filenameTemplate = sanitized;
+    } else if (options.filename) {
+      // User provided a template
+      filenameTemplate = options.filename;
+    } else {
+      // Use yt-dlp template with sanitization
+      // Limit title to 100 chars to avoid path length issues on Windows (MAX_PATH = 260)
+      // yt-dlp will sanitize invalid chars with --restrict-filenames
+      filenameTemplate = "%(title).100s.%(ext)s";
+    }
+
+    // Build output path with template
+    // yt-dlp will replace %(title)s and %(ext)s with actual values and sanitize automatically
+    const outputFilePath = path.join(outputDir, filenameTemplate);
 
     // Try to get initial file size from videoInfo
     let initialTotalBytes: number | null = null;
@@ -493,7 +624,7 @@ export class VideoDownloadService extends EventEmitter {
         filename: null,
       },
       outputPath: outputDir,
-      filename,
+      filename: filenameTemplate,
       createdAt: new Date(),
       startedAt: null,
       completedAt: null,
@@ -551,7 +682,7 @@ export class VideoDownloadService extends EventEmitter {
       item.filename || "%(title)s.%(ext)s"
     );
 
-    const args = this.buildArgs(item.options, outputFilePath);
+    const args = this.buildArgs(item.options, outputFilePath, item.videoInfo);
 
     try {
       const ytDlpWrap = getYtDlpWrap();

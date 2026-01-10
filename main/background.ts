@@ -4,6 +4,10 @@ import serve from "electron-serve";
 import { createWindow } from "./helpers";
 import { registerWindowIpc } from "./ipc/window-ipc";
 import { initializeDownloadIpc } from "./ipc/download-ipc";
+import {
+  getFfmpegPath,
+  isFfmpegAvailable,
+} from "./services/utils/binary-manager";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -33,6 +37,12 @@ if (isProd) {
 
   // Initialize Download IPC handlers
   initializeDownloadIpc();
+
+  // Check ffmpeg availability
+  const ffmpegAvailable = isFfmpegAvailable();
+  const ffmpegLocation = getFfmpegPath();
+  console.log("[Background] ffmpeg available:", ffmpegAvailable);
+  console.log("[Background] ffmpeg location:", ffmpegLocation);
 
   if (isProd) {
     await mainWindow.loadURL("app://./home");

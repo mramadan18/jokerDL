@@ -1,12 +1,25 @@
 /**
  * Binary Manager
  * Handles downloading and managing the yt-dlp executable using yt-dlp-wrap
+ * Also manages ffmpeg for merging video and audio streams
  */
 
 import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import YtDlpWrap from "yt-dlp-wrap";
+
+// Import ffmpeg path from @ffmpeg-installer/ffmpeg
+// This package bundles ffmpeg binaries for all platforms
+let ffmpegPath: string | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const ffmpeg = require("@ffmpeg-installer/ffmpeg");
+  ffmpegPath = ffmpeg.path;
+  console.log("[BinaryManager] ffmpeg path:", ffmpegPath);
+} catch (error) {
+  console.warn("[BinaryManager] ffmpeg-installer not available:", error);
+}
 
 // Platform-specific binary names
 const BINARY_NAMES: Record<string, string> = {
@@ -151,4 +164,27 @@ export async function getBinaryInfo(): Promise<{
  */
 export async function updateYtDlp(): Promise<void> {
   return downloadYtDlp();
+}
+
+/**
+ * Get the path to the ffmpeg binary
+ * Returns null if ffmpeg is not available
+ */
+export function getFfmpegPath(): string | null {
+  return ffmpegPath;
+}
+
+/**
+ * Check if ffmpeg is available
+ */
+export function isFfmpegAvailable(): boolean {
+  if (!ffmpegPath) {
+    return false;
+  }
+  
+  try {
+    return fs.existsSync(ffmpegPath);
+  } catch {
+    return false;
+  }
 }

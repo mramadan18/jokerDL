@@ -33,29 +33,42 @@ export function getDownloadSubPath(
 
 /**
  * Sanitize a filename to remove invalid characters
+ * Windows MAX_PATH is 260, but we need to account for the full path
  */
-export function sanitizeFilename(filename: string): string {
+export function sanitizeFilename(filename: string, maxLength: number = 200): string {
+  if (!filename || typeof filename !== "string") {
+    return "download";
+  }
+
   // Characters not allowed in Windows filenames
   const invalidChars = /[<>:"/\\|?*\x00-\x1f]/g;
 
   // Replace invalid characters with underscore
   let sanitized = filename.replace(invalidChars, "_");
 
-  // Remove leading/trailing spaces and dots
+  // Remove leading/trailing spaces, dots, and other problematic characters
   sanitized = sanitized.trim().replace(/^\.+|\.+$/g, "");
 
+  // Remove multiple consecutive spaces/underscores
+  sanitized = sanitized.replace(/[\s_]+/g, "_");
+
+  // Remove trailing spaces and dots (Windows doesn't allow these)
+  sanitized = sanitized.replace(/[\s.]+$/g, "");
+
   // Limit filename length (leaving room for extension)
-  const maxLength = 200;
   if (sanitized.length > maxLength) {
-    sanitized = sanitized.substring(0, maxLength);
+    sanitized = sanitized.substring(0, maxLength).trim();
   }
 
-  // Ensure filename is not empty
-  if (!sanitized) {
+  // Ensure filename is not empty and doesn't end with dot or space
+  if (!sanitized || sanitized === "." || sanitized === "..") {
     sanitized = "download";
   }
 
-  return sanitized;
+  // Remove any remaining trailing dots or spaces
+  sanitized = sanitized.replace(/[\s.]+$/g, "");
+
+  return sanitized || "download";
 }
 
 /**

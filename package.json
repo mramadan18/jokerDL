@@ -11,6 +11,7 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@heroui/react": "^2.8.7",
     "@heroui/theme": "^2.4.25",
     "@tailwindcss/postcss": "^4.1.18",
