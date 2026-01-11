@@ -22,6 +22,7 @@ export const QualityFormatSelectors = ({
       <Select
         label="Quality"
         selectedKeys={[selectedQuality]}
+        disallowEmptySelection
         onSelectionChange={(keys) => {
           const value = Array.from(keys)[0];
           onQualityChange(value);
@@ -39,6 +40,7 @@ export const QualityFormatSelectors = ({
       <Select
         label="Format"
         selectedKeys={[selectedFormat]}
+        disallowEmptySelection
         onSelectionChange={(keys) =>
           onFormatChange(Array.from(keys)[0] as string)
         }

@@ -13,7 +13,6 @@ export const VideoMetadata = ({
   formats,
   extractor,
 }: VideoInfo) => {
-  console.log("formats", formats);
   return (
     <div>
       <h3 className="text-2xl font-bold mb-2 line-clamp-2">{title}</h3>
@@ -30,18 +29,7 @@ export const VideoMetadata = ({
             <span>{formatViewCount(viewCount)} views</span>
           </div>
         )}
-        {formats.length > 0 && (
-          <div className="flex items-center gap-1">
-            <HardDrive size={16} />
-            <span>
-              {formatBytes(
-                Math.max(
-                  ...formats.map((f) => f.filesize || f.filesizeApprox || 0)
-                )
-              )}
-            </span>
-          </div>
-        )}
+
         <div className="flex items-center gap-1 text-primary font-medium">
           <Globe size={16} />
           <span>{extractor || "Direct Link"}</span>

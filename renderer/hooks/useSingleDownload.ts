@@ -43,7 +43,7 @@ export function useSingleDownload(): UseSingleDownloadReturn {
   // Local state
   const [url, setUrl] = useState("");
   const [selectedQuality, setSelectedQuality] = useState<string>("");
-  const [selectedFormat, setSelectedFormat] = useState("mp4");
+  const [selectedFormat, setSelectedFormat] = useState<string>("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
 
@@ -59,9 +59,17 @@ export function useSingleDownload(): UseSingleDownloadReturn {
     return selectedQuality === DownloadQuality.AUDIO_ONLY;
   }, [selectedQuality]);
 
+  const isGreater1080p = useMemo(() => {
+    return Number(selectedQuality?.split("p")?.[0]) > 1080;
+  }, [selectedQuality]);
+
   const currentFormats = useMemo(() => {
-    return isAudioOnly ? AUDIO_FORMAT_OPTIONS : FORMAT_OPTIONS;
-  }, [isAudioOnly]);
+    return isAudioOnly
+      ? AUDIO_FORMAT_OPTIONS
+      : isGreater1080p
+      ? FORMAT_OPTIONS.filter((f) => f.key === "mkv")
+      : FORMAT_OPTIONS;
+  }, [isAudioOnly, isGreater1080p]);
 
   const availableQualities = useMemo(() => {
     return getAvailableQualityOptions(videoInfo);
@@ -77,6 +85,18 @@ export function useSingleDownload(): UseSingleDownloadReturn {
       setSelectedQuality(availableQualities[0].key);
     }
   }, [availableQualities, selectedQuality]);
+
+  // Set default format when current formats change
+  useEffect(() => {
+    if (currentFormats.length > 0) {
+      if (
+        !selectedFormat ||
+        !currentFormats.find((f) => f.key === selectedFormat)
+      ) {
+        setSelectedFormat(currentFormats[0].key);
+      }
+    }
+  }, [currentFormats, selectedFormat]);
 
   // Handle URL input change
   const handleUrlChange = useCallback(
@@ -163,8 +183,6 @@ export function useSingleDownload(): UseSingleDownloadReturn {
     // Reset format when switching to/from audio
     if (quality === DownloadQuality.AUDIO_ONLY) {
       setSelectedFormat("mp3");
-    } else {
-      setSelectedFormat("mp4");
     }
   }, []);
 
