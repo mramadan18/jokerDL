@@ -130,14 +130,22 @@ export class VideoDownloadService extends EventEmitter {
           uploaderUrl: metadata.uploader_url || null,
           thumbnail: metadata.thumbnail || null,
           videoCount: metadata.entries.length,
-          videos: metadata.entries.map((e: any, index: number) => ({
-            id: e.id,
-            title: e.title,
-            duration: e.duration || null,
-            thumbnail: e.thumbnail || null,
-            url: e.url || e.webpage_url,
-            index: index + 1,
-          })),
+          videos: metadata.entries.map((e: any, index: number) => {
+            const entryThumbnail =
+              e.thumbnail ||
+              (e.thumbnails && e.thumbnails.length > 0
+                ? e.thumbnails[e.thumbnails.length - 1].url
+                : null);
+
+            return {
+              id: e.id,
+              title: e.title,
+              duration: e.duration || null,
+              thumbnail: entryThumbnail,
+              url: e.url || e.webpage_url,
+              index: index + 1,
+            };
+          }),
         };
       }
 

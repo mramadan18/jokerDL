@@ -4,7 +4,7 @@
  */
 
 import {
-  spawnYtDlp,
+  getYtDlpWrap,
   isBinaryAvailable,
   ensureYtDlp,
 } from "../../utils/binary-manager";
@@ -240,61 +240,38 @@ export async function extractVideoInfo(
     }
   }
 
-  return new Promise((resolve) => {
-    const args = [
+  try {
+    const ytDlp = getYtDlpWrap();
+    const stdout = await ytDlp.execPromise([
       "--dump-json",
       "--no-download",
-      "--no-playlist", // Get single video info, not entire playlist
-      "--flat-playlist", // Quick info for playlists
+      "--no-playlist",
+      "--flat-playlist",
       "--no-warnings",
       "-q",
       url,
-    ];
+    ]);
 
-    const process = spawnYtDlp(args);
-    let stdout = "";
-    let stderr = "";
-
-    process.stdout?.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    process.stderr?.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    process.on("close", (code) => {
-      if (code !== 0 || !stdout) {
-        resolve({
-          success: false,
-          error: stderr || "Failed to extract video information",
-        });
-        return;
-      }
-
-      try {
-        const info = JSON.parse(stdout) as YtDlpInfo;
-        const videoInfo = parseVideoInfo(info);
-
-        resolve({
-          success: true,
-          data: videoInfo,
-        });
-      } catch (parseError) {
-        resolve({
-          success: false,
-          error: "Failed to parse video information",
-        });
-      }
-    });
-
-    process.on("error", (error) => {
-      resolve({
+    if (!stdout) {
+      return {
         success: false,
-        error: `Process error: ${error.message}`,
-      });
-    });
-  });
+        error: "Failed to extract video information: No output",
+      };
+    }
+
+    const info = JSON.parse(stdout) as YtDlpInfo;
+    const videoInfo = parseVideoInfo(info);
+
+    return {
+      success: true,
+      data: videoInfo,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || "Failed to extract video information",
+    };
+  }
 }
 
 /**
@@ -314,87 +291,70 @@ export async function extractPlaylistInfo(
     }
   }
 
-  return new Promise((resolve) => {
-    const args = [
+  try {
+    const ytDlp = getYtDlpWrap();
+    const stdout = await ytDlp.execPromise([
       "--dump-json",
       "--no-download",
-      "--flat-playlist", // Get playlist entries quickly
+      "--flat-playlist",
       "--no-warnings",
       "-q",
       url,
-    ];
+    ]);
 
-    const process = spawnYtDlp(args);
-    let stdout = "";
-    let stderr = "";
-
-    process.stdout?.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    process.stderr?.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    process.on("close", (code) => {
-      if (code !== 0 || !stdout) {
-        resolve({
-          success: false,
-          error: stderr || "Failed to extract playlist information",
-        });
-        return;
-      }
-
-      try {
-        // yt-dlp outputs each playlist entry as a separate JSON line
-        const lines = stdout.trim().split("\n");
-        const entries: PlaylistVideoEntry[] = [];
-
-        for (let i = 0; i < lines.length; i++) {
-          const entry = JSON.parse(lines[i]) as YtDlpInfo;
-          entries.push({
-            id: entry.id,
-            title: entry.title,
-            duration: entry.duration || null,
-            thumbnail: entry.thumbnail || null,
-            url: entry.webpage_url,
-            index: i + 1,
-          });
-        }
-
-        // Get first entry for playlist metadata
-        const firstEntry = JSON.parse(lines[0]) as YtDlpInfo;
-
-        const playlistInfo: PlaylistInfo = {
-          id: firstEntry.id,
-          title: "Playlist",
-          description: null,
-          uploader: firstEntry.uploader || null,
-          uploaderUrl: firstEntry.uploader_url || null,
-          thumbnail: entries[0]?.thumbnail || null,
-          videoCount: entries.length,
-          videos: entries,
-        };
-
-        resolve({
-          success: true,
-          data: playlistInfo,
-        });
-      } catch (parseError) {
-        resolve({
-          success: false,
-          error: "Failed to parse playlist information",
-        });
-      }
-    });
-
-    process.on("error", (error) => {
-      resolve({
+    if (!stdout) {
+      return {
         success: false,
-        error: `Process error: ${error.message}`,
+        error: "Failed to extract playlist information: No output",
+      };
+    }
+
+    // yt-dlp outputs each playlist entry as a separate JSON line
+    const lines = stdout.trim().split("\n");
+    const entries: PlaylistVideoEntry[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const entry = JSON.parse(lines[i]) as any;
+      const entryThumbnail =
+        entry.thumbnail ||
+        (entry.thumbnails && entry.thumbnails.length > 0
+          ? entry.thumbnails[entry.thumbnails.length - 1].url
+          : null);
+
+      entries.push({
+        id: entry.id,
+        title: entry.title,
+        duration: entry.duration || null,
+        thumbnail: entryThumbnail,
+        url: entry.webpage_url,
+        index: i + 1,
       });
-    });
-  });
+    }
+
+    // Get first entry for playlist metadata
+    const firstEntry = JSON.parse(lines[0]) as any;
+
+    const playlistInfo: PlaylistInfo = {
+      id: firstEntry.id,
+      title: "Playlist",
+      description: null,
+      uploader: firstEntry.uploader || null,
+      uploaderUrl: firstEntry.uploader_url || null,
+      thumbnail: entries[0]?.thumbnail || null,
+      videoCount: entries.length,
+      videos: entries,
+    };
+
+    return {
+      success: true,
+      data: playlistInfo,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || "Failed to extract playlist information",
+    };
+  }
 }
 
 /**
@@ -425,19 +385,13 @@ export async function isUrlSupported(url: string): Promise<boolean> {
     return false;
   }
 
-  return new Promise((resolve) => {
-    const args = ["--simulate", "--no-download", "--quiet", url];
-
-    const process = spawnYtDlp(args);
-
-    process.on("close", (code) => {
-      resolve(code === 0);
-    });
-
-    process.on("error", () => {
-      resolve(false);
-    });
-  });
+  try {
+    const ytDlp = getYtDlpWrap();
+    await ytDlp.execPromise(["--simulate", "--no-download", "--quiet", url]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

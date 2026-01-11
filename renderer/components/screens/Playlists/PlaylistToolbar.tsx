@@ -6,6 +6,8 @@ interface PlaylistToolbarProps {
   totalCount: number;
   onToggleSelectAll: () => void;
   isAllSelected: boolean;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
 }
 
 export const PlaylistToolbar: React.FC<PlaylistToolbarProps> = ({
@@ -13,6 +15,8 @@ export const PlaylistToolbar: React.FC<PlaylistToolbarProps> = ({
   totalCount,
   onToggleSelectAll,
   isAllSelected,
+  searchQuery,
+  onSearchChange,
 }) => {
   return (
     <div className="flex items-center justify-between px-2">
@@ -35,8 +39,11 @@ export const PlaylistToolbar: React.FC<PlaylistToolbarProps> = ({
         <Input
           size="sm"
           placeholder="Filter items..."
+          value={searchQuery}
+          onValueChange={onSearchChange}
           startContent={<Search size={14} />}
           className="w-64"
+          isClearable
         />
       </div>
     </div>
