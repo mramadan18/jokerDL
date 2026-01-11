@@ -274,14 +274,6 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
     supportsSubtitles: true,
     supportsQualitySelection: true,
   },
-  twitch: {
-    name: "Twitch",
-    icon: "twitch",
-    domains: ["twitch.tv"],
-    supportsPlaylist: false,
-    supportsSubtitles: false,
-    supportsQualitySelection: true,
-  },
 };
 
 /**

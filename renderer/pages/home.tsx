@@ -5,7 +5,7 @@ import {
   VideoInfoCard,
   SupportedPlatforms,
   UrlInputCard,
-} from "../components/screens/SingleDownload/";
+} from "../components/screens/SingleDownload";
 
 const HomePage = () => {
   const {
