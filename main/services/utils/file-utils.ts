@@ -19,7 +19,7 @@ export function getDefaultDownloadPath(): string {
  * Get a subdirectory in downloads for specific content types
  */
 export function getDownloadSubPath(
-  subDir: "videos" | "audio" | "playlists"
+  subDir: "videos" | "audios" | "playlists"
 ): string {
   const basePath = getDefaultDownloadPath();
   const subPath = path.join(basePath, "IDM-Clone", subDir);

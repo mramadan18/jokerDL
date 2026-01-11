@@ -246,7 +246,9 @@ export const DownloadCard = ({
             </div>
 
             {item.error && item.status === DownloadStatus.FAILED && (
-              <p className="text-xs text-danger mt-2 truncate">{item.error}</p>
+              <p className="text-xs text-danger mt-2 truncate text-wrap">
+                {item.error}
+              </p>
             )}
           </div>
         </div>

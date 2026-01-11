@@ -345,7 +345,7 @@ export function initializeDownloadIpc(): void {
     "download:get-sub-path",
     async (
       _,
-      type: "videos" | "audio" | "playlists"
+      type: "videos" | "audios" | "playlists"
     ): Promise<ApiResponse<string>> => {
       try {
         const path = getDownloadSubPath(type);

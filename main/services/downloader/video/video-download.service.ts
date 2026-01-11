@@ -373,6 +373,12 @@ export class VideoDownloadService extends EventEmitter {
       outputFilePath,
     ];
 
+    // Add ffmpeg location if available - REQUIRED for post-processing (merging & audio extraction)
+    const ffmpegLocation = getFfmpegPath();
+    if (ffmpegLocation && isFfmpegAvailable()) {
+      args.push("--ffmpeg-location", ffmpegLocation);
+    }
+
     // Quality/Format selection
     if (options.audioOnly) {
       args.push("-f", "bestaudio");
@@ -502,17 +508,6 @@ export class VideoDownloadService extends EventEmitter {
     // Merge format for video+audio
     // CRITICAL: yt-dlp requires ffmpeg to merge video and audio streams
     if (!options.audioOnly) {
-      // Add ffmpeg location if available - REQUIRED for merging DASH streams
-      const ffmpegLocation = getFfmpegPath();
-      if (ffmpegLocation && isFfmpegAvailable()) {
-        args.push("--ffmpeg-location", ffmpegLocation);
-        console.log("[buildArgs] Using ffmpeg at:", ffmpegLocation);
-      } else {
-        console.warn(
-          "[buildArgs] WARNING: ffmpeg not available, merging may fail!"
-        );
-      }
-
       // Specify output format (container)
       args.push("--merge-output-format", options.format || "mp4");
 
@@ -744,7 +739,9 @@ export class VideoDownloadService extends EventEmitter {
 
     // Create download item
     const downloadId = randomUUID();
-    const outputDir = options.outputPath || getDownloadSubPath("videos");
+    const outputDir =
+      options.outputPath ||
+      getDownloadSubPath(options.audioOnly ? "audios" : "videos");
 
     // Ensure output directory exists
     if (!fs.existsSync(outputDir)) {
