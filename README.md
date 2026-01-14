@@ -19,13 +19,13 @@
 - 🚀 **Universal Support**: Download from YouTube, TikTok, Instagram, Twitter(X), Facebook, Vimeo, Twitch, Dailymotion, and 1000+ other sites.
 - 📊 **Real-time Progress**: Track download speed, ETA, and progress percentage with a smooth, live-updating UI.
 - 🎞️ **Quality Selection**: Choose your preferred quality from 360p up to 4K (if available).
-- 🎵 **Audio Extraction**: Download high-quality audio directly in MP3, M4A, OPUS, or FLAC formats (auto-saved to `audios` folder).
+- 🎵 **Smart Audio**: Download high-quality audio directly (MP3/M4A/FLAC) with auto-organization into the `audios` directory.
 - 📝 **Info Extraction**: See title, duration, uploader, and thumbnails before you even start the download.
 - 🎬 **Playlist/Channel**: Download entire playlists or channels from YouTube and Vimeo with a single click.
 - 🃏 **Multiple Links**: Add unlimited links to the queue and process them in bulk.
 - ⚡ **Concurrent Downloads**: Smart queue management for fast simultaneous downloads (up to 3 files).
 - 🎛️ **Download Management**: Pause, resume, retry, or cancel downloads with full control.
-- 📚 **Download History**: Keep track of all your past downloads with search and filter capabilities.
+- 📚 **Smart History**: Auto-grouped by date (Today, Yesterday, etc.), real-time search, file existence checks, and direct file/folder access.
 - ⚙️ **Customizable Settings**: Configure download paths, concurrent download limits, and theme preferences.
 - 💎 **Premium UI**: Dark-mode-first aesthetic with Glassmorphism effects and smooth Framer Motion animations.
 - 🛠️ **Binary Management**: Automatically downloads and updates the latest `yt-dlp` and `aria2` engines in the background.

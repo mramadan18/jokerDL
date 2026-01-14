@@ -41,11 +41,11 @@ const HomePage = () => {
       {/* Header */}
       <div className="text-center mb-10">
         <h1 className="text-5xl font-black pb-2 leading-tight bg-linear-to-r from-violet-600 via-fuchsia-500 to-emerald-500 bg-clip-text text-transparent inline-block tracking-tight">
-          Single Video Download
+          Quick Download
         </h1>
         <p className="text-default-500 max-w-md mx-auto">
-          Paste any video link to start downloading. Supports YouTube, TikTok,
-          Instagram, Twitter, and 1000+ more sites.
+          Paste any link to start downloading instantly. Supports Videos, Music,
+          Documents and more from 1000+ sites.
         </p>
       </div>
 

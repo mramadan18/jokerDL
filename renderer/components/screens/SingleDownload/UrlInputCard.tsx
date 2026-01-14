@@ -89,7 +89,7 @@ export const UrlInputCard = ({
           <Input
             ref={inputRef}
             type="url"
-            placeholder="Paste video URL here..."
+            placeholder="Paste link here..."
             value={url}
             onValueChange={onUrlChange}
             onKeyDown={onKeyPress}
