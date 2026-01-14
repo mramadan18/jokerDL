@@ -7,9 +7,10 @@
   <img src="https://img.shields.io/badge/Next.js-14.2.4-black?style=for-the-badge&logo=next.js" alt="Next.js">
   <img src="https://img.shields.io/badge/Tailwind_CSS-4.1.18-38B2AC?style=for-the-badge&logo=tailwind-css" alt="TailwindCSS">
   <img src="https://img.shields.io/badge/yt--dlp-Latest-red?style=for-the-badge&logo=youtube" alt="yt-dlp">
+  <img src="https://img.shields.io/badge/aria2-Latest-8a2be2?style=for-the-badge" alt="aria2">
 </p>
 
-**JokerDL** is a premium, high-performance desktop application designed to make downloading media from the internet as easy as a single click. Built with Electron, Next.js, and the power of `yt-dlp`, it supports thousands of websites with a beautiful, modern user interface.
+**JokerDL** is a premium, high-performance desktop application designed to make downloading media from the internet as easy as a single click. Built with Electron, Next.js, and the power of `yt-dlp` & `aria2`, it supports thousands of websites with a beautiful, modern user interface.
 
 ---
 
@@ -27,7 +28,7 @@
 - 📚 **Download History**: Keep track of all your past downloads with search and filter capabilities.
 - ⚙️ **Customizable Settings**: Configure download paths, concurrent download limits, and theme preferences.
 - 💎 **Premium UI**: Dark-mode-first aesthetic with Glassmorphism effects and smooth Framer Motion animations.
-- 🛠️ **Binary Management**: Automatically downloads and updates the latest `yt-dlp` engine in the background.
+- 🛠️ **Binary Management**: Automatically downloads and updates the latest `yt-dlp` and `aria2` engines in the background.
 
 ---
 
@@ -38,7 +39,7 @@
 - **Styling**: Tailwind CSS v4
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
-- **Core Engine**: [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+- **Core Engine**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) & [aria2](https://github.com/aria2/aria2)
 
 ---
 
