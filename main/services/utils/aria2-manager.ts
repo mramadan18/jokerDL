@@ -9,6 +9,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { ChildProcess, spawn } from "child_process";
 import * as net from "net";
+import { APP_CONFIG } from "../../../renderer/config/app-config";
+import { settingsService } from "../settings.service";
 
 // Get aria2 binary path based on platform
 function resolveAria2Binary(): string | null {
@@ -80,7 +82,9 @@ let aria2Path: string | null = resolveAria2Binary();
 
 // Aria2 RPC configuration
 const ARIA2_RPC_PORT = 6800;
-const ARIA2_RPC_SECRET = "idm-clone-secret";
+const ARIA2_RPC_SECRET = `${APP_CONFIG.name
+  .toLowerCase()
+  .replace(/\s+/g, "-")}-secret`;
 
 // Global aria2 process reference
 let aria2Process: ChildProcess | null = null;
@@ -176,7 +180,9 @@ export async function startAria2Daemon(): Promise<void> {
     "--save-session-interval=10", // Save every 10s for better recovery
 
     // Download optimization
-    "--max-concurrent-downloads=50",
+    `--max-concurrent-downloads=${
+      settingsService.getSettings().maxConcurrentDownloads
+    }`,
     "--max-connection-per-server=8", // Optimal balance for stability and speed
     "--split=16",
     "--min-split-size=4M",

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/router";
 import {
   Sun,
   Moon,
@@ -10,6 +11,7 @@ import {
   Settings,
   RefreshCw,
   Terminal,
+  ChevronRight,
 } from "lucide-react";
 import {
   Button,
@@ -20,11 +22,27 @@ import {
 } from "@heroui/react";
 import { useWindowControls } from "../../hooks/use-window-controls";
 
+import { APP_CONFIG } from "../../config/app-config";
+
 const Topbar = () => {
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const { isMaximized, minimize, maximize, close, reload, toggleDevTools } =
     useWindowControls();
+
+  // Helper to get title based on path
+  const getPageTitle = (path: string) => {
+    const titles: Record<string, string> = {
+      "/home": "Quick Download",
+      "/playlist": "Playlist & Channel",
+      "/multi": "Multiple Links",
+      "/downloads": "Downloads Manager",
+      "/history": "Download History",
+      "/settings": "Settings & Preferences",
+    };
+    return titles[path] || "Remix DM";
+  };
 
   // When mounted on client, now we can show the UI
   useEffect(() => {
@@ -33,20 +51,22 @@ const Topbar = () => {
 
   return (
     <header
-      className="h-14 w-full bg-background border-b border-divider flex items-center justify-between px-4 select-none"
+      className="h-14 w-full bg-background/80 backdrop-blur-md border-b border-divider flex items-center justify-between px-4 select-none z-50 sticky top-0"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       <div
-        className="flex items-center gap-2"
-        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        className="flex items-center gap-3"
+        style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
-        {/* Breadcrumb or Title Placeholder - keeping it clean for now */}
-        <span className="text-sm font-bold tracking-tight text-foreground">
-          JokerDL
-        </span>
-        <span className="text-[10px] px-1.5 py-0.5 bg-violet-500/10 text-violet-500 rounded font-bold border border-violet-500/20">
-          PRO
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 tracking-tighter uppercase">
+            {APP_CONFIG.shortName}
+          </span>
+          <ChevronRight size={14} className="text-default-300" />
+          <span className="text-sm font-bold text-default-600 tracking-tight">
+            {getPageTitle(router.pathname)}
+          </span>
+        </div>
       </div>
 
       <div
@@ -59,7 +79,7 @@ const Topbar = () => {
               isIconOnly
               variant="light"
               size="sm"
-              className="text-default-500 hover:text-foreground"
+              className="text-default-500 hover:text-foreground hover:bg-default-100"
             >
               <Settings size={18} />
             </Button>
@@ -87,7 +107,7 @@ const Topbar = () => {
           variant="light"
           size="sm"
           onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="text-default-500 hover:text-foreground"
+          className="text-default-500 hover:text-foreground hover:bg-default-100"
         >
           {mounted ? (
             theme === "dark" ? (

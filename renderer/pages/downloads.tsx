@@ -10,7 +10,7 @@ import {
 import { DownloadStatus, useDownloads } from "../hooks/useDownload";
 
 const DownloadsPage = () => {
-  const [selectedTab, setSelectedTab] = useState("active");
+  const [selectedTab, setSelectedTab] = useState("all");
   const {
     downloads,
     activeDownloads,

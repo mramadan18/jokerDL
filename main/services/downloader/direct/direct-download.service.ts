@@ -10,16 +10,12 @@ import * as path from "path";
 import * as fs from "fs";
 import { powerSaveBlocker } from "electron";
 import { v4 as uuidv4 } from "uuid";
-import {
-  DownloadItem,
-  DownloadProgress,
-  DownloadStatus,
-  DownloadOptions,
-} from "../types";
+import { DownloadItem, DownloadStatus, DownloadOptions } from "../types";
+import { APP_CONFIG } from "../../../../renderer/config/app-config";
+import { settingsService } from "../../settings.service";
 import {
   ensureAria2,
   getAria2RpcConfig,
-  isAria2DaemonRunning,
   restartAria2Daemon,
 } from "../../utils/aria2-manager";
 import {
@@ -28,15 +24,15 @@ import {
   getCategoryByExtension,
   getFreeDiskSpace,
   deleteFileWithRetry,
-  renameFileForDeletion,
-  scheduleFileDeletion,
+  generateUniqueFilename,
 } from "../../utils/file-utils";
 import { detectLinkType } from "./url-detection.service";
 
 // Generate unique request IDs
 let requestIdCounter = 0;
 function getRequestId(): string {
-  return `idm-clone-${++requestIdCounter}`;
+  const appId = APP_CONFIG.name.toLowerCase().replace(/\s+/g, "-");
+  return `${appId}-${++requestIdCounter}`;
 }
 
 /**
@@ -146,6 +142,7 @@ class DirectDownloadService extends EventEmitter {
             try {
               await this.syncWithAria2();
               await this.restoreActiveDownloads();
+              await this.updateGlobalSettings();
               this.startProgressPolling();
               this.updatePowerSaveStatus();
             } catch (err) {
@@ -861,13 +858,48 @@ class DirectDownloadService extends EventEmitter {
       }
 
       const initialFilename = options.filename || linkInfo.filename;
+      const settings = settingsService.getSettings();
 
       // Determine output directory
       let outputDir = options.outputPath;
       if (!outputDir) {
-        // Auto-categorize based on filename
+        // Use global download path from settings
         const category = getCategoryByExtension(initialFilename || options.url);
         outputDir = getDownloadSubPath(category as any);
+      }
+
+      // 0.5 Handle file existence based on settings
+      let finalFilename = initialFilename;
+      if (finalFilename) {
+        const fullPath = path.join(outputDir, finalFilename);
+        if (fs.existsSync(fullPath)) {
+          if (settings.onFileExists === "skip") {
+            console.log(`[DirectDownload] File exists, skipping: ${fullPath}`);
+            return {
+              success: true,
+              error: "File already exists (skipped)",
+            };
+          } else if (settings.onFileExists === "overwrite") {
+            console.log(
+              `[DirectDownload] File exists, overwriting: ${fullPath}`
+            );
+            try {
+              if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+              if (fs.existsSync(`${fullPath}.aria2`))
+                fs.unlinkSync(`${fullPath}.aria2`);
+            } catch (err) {
+              console.warn(
+                `[DirectDownload] Failed to delete existing file for overwrite:`,
+                err
+              );
+            }
+          } else if (settings.onFileExists === "rename") {
+            finalFilename = generateUniqueFilename(outputDir, finalFilename);
+            console.log(
+              `[DirectDownload] File exists, renamed to: ${finalFilename}`
+            );
+          }
+        }
       }
 
       // 1. Aggressive duplication check (URL + Filename)
@@ -965,8 +997,8 @@ class DirectDownloadService extends EventEmitter {
         "check-certificate": "false",
       };
 
-      if (initialFilename) {
-        aria2Options.out = sanitizeFilename(initialFilename);
+      if (finalFilename) {
+        aria2Options.out = sanitizeFilename(finalFilename);
       }
 
       // Ensure URL is properly encoded for aria2
@@ -997,10 +1029,10 @@ class DirectDownloadService extends EventEmitter {
           speedString: null,
           eta: null,
           etaString: null,
-          filename: initialFilename || null,
+          filename: finalFilename || null,
         },
         outputPath: outputDir,
-        filename: initialFilename || null,
+        filename: finalFilename || null,
         createdAt: new Date(),
         startedAt: new Date(),
         completedAt: null,
@@ -1505,6 +1537,26 @@ class DirectDownloadService extends EventEmitter {
       }
     } catch (error) {
       console.warn("[DirectDownload] Sync failed:", error);
+    }
+  }
+
+  /**
+   * Update global aria2 settings from app settings
+   */
+  async updateGlobalSettings(): Promise<void> {
+    const settings = settingsService.getSettings();
+    try {
+      await this.sendRequest("aria2.changeGlobalOption", [
+        {
+          "max-concurrent-downloads":
+            settings.maxConcurrentDownloads.toString(),
+        },
+      ]);
+      console.log(
+        `[DirectDownload] Global settings updated: max-concurrent=${settings.maxConcurrentDownloads}`
+      );
+    } catch (err) {
+      console.warn("[DirectDownload] Failed to update global options:", err);
     }
   }
 

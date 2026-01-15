@@ -1,6 +1,6 @@
-appId: com.example.nextron
-productName: My Nextron App
-copyright: Copyright © 2018 Yoshihide Shiono
+appId: com.remixdm.app
+productName: RemixDM
+copyright: Copyright © 2026 Mahmoud Ramadan
 directories:
   output: dist
   buildResources: resources

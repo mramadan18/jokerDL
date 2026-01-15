@@ -24,7 +24,7 @@ export const DownloadActions = ({
           isLoading={isDownloading}
           isDisabled={isDownloading}
           onPress={onDownload}
-          className="font-bold bg-linear-to-r from-violet-600 to-fuchsia-600 text-white"
+          className="font-bold bg-linear-to-r from-brand-cyan to-brand-purple text-white"
           startContent={!isDownloading && <Download size={18} />}
         >
           {isDownloading ? "Starting..." : "Download Now"}

@@ -9,6 +9,8 @@ import {
   HardDrive,
 } from "lucide-react";
 import { Button } from "@heroui/react";
+import { APP_CONFIG } from "../../config/app-config";
+import Image from "next/image";
 
 const Sidebar = () => {
   const router = useRouter();
@@ -27,16 +29,20 @@ const Sidebar = () => {
       <div>
         <div className="mb-10 flex items-center gap-3 px-2">
           <div className="relative flex items-center justify-center">
-            <div className="w-10 h-10 bg-linear-to-br from-violet-600 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20 transform rotate-3">
-              <Download className="text-white w-6 h-6" />
-            </div>
+            <Image
+              src="/images/logo.png"
+              alt="Logo"
+              width={500}
+              height={500}
+              className="w-10 h-10"
+            />
           </div>
           <div className="flex flex-col">
-            <span className="text-2xl font-black tracking-tighter leading-none bg-linear-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent">
-              JokerDL
+            <span className="text-2xl font-black tracking-tighter leading-none bg-linear-to-r from-brand-cyan to-brand-purple bg-clip-text text-transparent">
+              {APP_CONFIG.name}
             </span>
             <span className="text-[10px] font-bold text-default-400 tracking-[0.2em] uppercase">
-              Pro Downloader
+              {APP_CONFIG.slogan}
             </span>
           </div>
         </div>

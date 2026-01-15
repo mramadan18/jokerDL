@@ -40,6 +40,7 @@ import {
   PlaylistVideoEntry,
   QualityOption,
 } from "../types";
+import { settingsService } from "../../settings.service";
 
 /**
  * Download manager class for managing video downloads
@@ -52,9 +53,9 @@ export class VideoDownloadService extends EventEmitter {
   // Track downloads that reached 100% or completed merge
   private completedDownloads: Set<string> = new Set();
 
-  constructor(maxConcurrent: number = 3) {
+  constructor() {
     super();
-    this.maxConcurrent = maxConcurrent;
+    this.maxConcurrent = settingsService.getSettings().maxConcurrentDownloads;
   }
 
   /**
@@ -383,6 +384,13 @@ export class VideoDownloadService extends EventEmitter {
       "-o",
       outputFilePath,
     ];
+
+    const settings = settingsService.getSettings();
+    if (settings.onFileExists === "skip") {
+      args.push("--no-overwrites");
+    } else if (settings.onFileExists === "overwrite") {
+      args.push("--force-overwrites");
+    }
 
     // Add ffmpeg location if available - REQUIRED for post-processing (merging & audio extraction)
     const ffmpegLocation = getFfmpegPath();
@@ -749,6 +757,7 @@ export class VideoDownloadService extends EventEmitter {
    * Process the download queue
    */
   private processQueue(): void {
+    this.maxConcurrent = settingsService.getSettings().maxConcurrentDownloads;
     const runningCount = this.activeDownloads.size;
     const availableSlots = this.maxConcurrent - runningCount;
 

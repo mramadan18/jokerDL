@@ -102,7 +102,7 @@ export const UrlInputCard: React.FC<UrlInputCardProps> = ({
             onContextMenu={handleContextMenu}
             onClick={() => setIsOpen(false)}
             isReadOnly={isOpen}
-            startContent={<ListVideo className="text-violet-500" />}
+            startContent={<ListVideo className="text-primary" />}
             endContent={
               platform && (
                 <Chip size="sm" color="secondary" variant="flat">
@@ -139,21 +139,21 @@ export const UrlInputCard: React.FC<UrlInputCardProps> = ({
                   className="flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg cursor-pointer text-foreground transition-colors hover:bg-default-100"
                   onClick={handleCopy}
                 >
-                  <Copy size={16} className="text-violet-500" />
+                  <Copy size={16} className="text-primary" />
                   <span className="text-sm">Copy</span>
                 </div>
                 <div
                   className="flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg cursor-pointer text-foreground transition-colors hover:bg-default-100"
                   onClick={handleCut}
                 >
-                  <Scissors size={16} className="text-violet-500" />
+                  <Scissors size={16} className="text-primary" />
                   <span className="text-sm">Cut</span>
                 </div>
                 <div
                   className="flex items-center gap-3 px-3 py-2 mx-1.5 rounded-lg cursor-pointer text-foreground transition-colors hover:bg-default-100"
                   onClick={handlePaste}
                 >
-                  <Clipboard size={16} className="text-violet-500" />
+                  <Clipboard size={16} className="text-primary" />
                   <span className="text-sm">Paste</span>
                 </div>
               </div>
@@ -167,7 +167,7 @@ export const UrlInputCard: React.FC<UrlInputCardProps> = ({
           onPress={onFetch}
           isLoading={isLoading}
           isDisabled={!url.trim() || !url.startsWith("http") || isLoading}
-          className="h-14 px-8 font-bold bg-linear-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          className="h-14 px-8 font-bold bg-linear-to-r from-brand-cyan to-brand-purple text-white shadow-lg shadow-brand-cyan/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
           endContent={!isLoading && <Download size={20} />}
         >
           {isLoading ? "Fetching..." : "Fetch List"}

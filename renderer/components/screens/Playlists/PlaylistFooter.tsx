@@ -27,7 +27,7 @@ export const PlaylistFooter: React.FC<PlaylistFooterProps> = ({
       <Button
         size="lg"
         color="primary"
-        className="font-bold shadow-lg h-14 px-8 bg-linear-to-r from-violet-600 to-fuchsia-600 text-white shadow-violet-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+        className="font-bold shadow-lg h-14 px-8 bg-linear-to-r from-brand-cyan to-brand-purple text-white shadow-brand-cyan/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
         startContent={!isLoading && <Download size={22} />}
         isDisabled={selectedCount === 0 || isLoading}
         onPress={onDownload}

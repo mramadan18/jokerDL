@@ -17,7 +17,7 @@ export const HistoryHeader = ({
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 className="text-4xl font-black bg-linear-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">
+        <h1 className="text-4xl font-black bg-linear-to-r from-brand-cyan to-brand-purple bg-clip-text text-transparent">
           History
         </h1>
         <p className="text-default-500 text-sm">Manage your past downloads</p>

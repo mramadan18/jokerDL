@@ -40,7 +40,7 @@ const HomePage = () => {
     <div className="w-full max-w-4xl mx-auto">
       {/* Header */}
       <div className="text-center mb-10">
-        <h1 className="text-5xl font-black pb-2 leading-tight bg-linear-to-r from-violet-600 via-fuchsia-500 to-emerald-500 bg-clip-text text-transparent inline-block tracking-tight">
+        <h1 className="text-5xl font-black pb-2 leading-tight bg-linear-to-r from-brand-cyan to-brand-purple bg-clip-text text-transparent inline-block tracking-tight">
           Quick Download
         </h1>
         <p className="text-default-500 max-w-md mx-auto">

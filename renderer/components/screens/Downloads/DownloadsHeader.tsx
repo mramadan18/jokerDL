@@ -1,5 +1,6 @@
 import { Button } from "@heroui/react";
 import { Pause, Play, Trash2 } from "lucide-react";
+import { APP_CONFIG } from "../../../config/app-config";
 
 interface DownloadsHeaderProps {
   total: number;
@@ -27,8 +28,8 @@ export const DownloadsHeader = ({
   return (
     <div className="flex items-center justify-between mb-6">
       <div>
-        <h1 className="text-3xl font-black bg-linear-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
-          JokerDL Downloads
+        <h1 className="text-3xl font-black bg-linear-to-r from-brand-cyan to-brand-purple bg-clip-text text-transparent">
+          {APP_CONFIG.name} Downloads
         </h1>
         <p className="text-default-500 text-sm mt-1">
           {total} total • {active} active • {completed} completed

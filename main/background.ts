@@ -6,6 +6,7 @@ import { registerWindowIpc } from "./ipc/window-ipc";
 import { registerShellIpc } from "./ipc/shell-ipc";
 import { initializeDownloadIpc } from "./ipc/download-ipc";
 import { initializeHistoryIpc } from "./ipc/history-ipc";
+import { initializeSettingsIpc } from "./ipc/settings-ipc";
 import { startHistoryRecording } from "./services/history.service";
 import {
   getFfmpegPath,
@@ -45,6 +46,7 @@ if (isProd) {
   // Initialize Download IPC handlers
   initializeDownloadIpc();
   initializeHistoryIpc();
+  initializeSettingsIpc();
   startHistoryRecording();
 
   // Check ffmpeg availability

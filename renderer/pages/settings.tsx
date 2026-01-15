@@ -23,6 +23,20 @@ const SettingsPage = () => {
   >("idle");
   const [updateError, setUpdateError] = useState<string | null>(null);
 
+  // aria2 engine state
+  const [aria2Info, setAria2Info] = useState<{
+    path: string | null;
+    available: boolean;
+    running: boolean;
+  } | null>(null);
+  const [isRestartingAria2, setIsRestartingAria2] = useState(false);
+
+  // ffmpeg engine state
+  const [ffmpegInfo, setFfmpegInfo] = useState<{
+    path: string | null;
+    available: boolean;
+  } | null>(null);
+
   const fetchBinaryInfo = useCallback(async () => {
     try {
       const result = await window.ipc.invoke("download:get-binary-info", null);
@@ -31,6 +45,28 @@ const SettingsPage = () => {
       }
     } catch (error) {
       console.error("Failed to fetch binary info:", error);
+    }
+  }, []);
+
+  const fetchAria2Info = useCallback(async () => {
+    try {
+      const result = await window.ipc.invoke("download:get-aria2-info", null);
+      if (result.success && result.data) {
+        setAria2Info(result.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch aria2 info:", error);
+    }
+  }, []);
+
+  const fetchFfmpegInfo = useCallback(async () => {
+    try {
+      const result = await window.ipc.invoke("download:get-ffmpeg-info", null);
+      if (result.success && result.data) {
+        setFfmpegInfo(result.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch ffmpeg info:", error);
     }
   }, []);
 
@@ -57,10 +93,26 @@ const SettingsPage = () => {
     }
   };
 
+  const handleRestartAria2 = async () => {
+    setIsRestartingAria2(true);
+    try {
+      const result = await window.ipc.invoke("download:restart-aria2", null);
+      if (result.success) {
+        await fetchAria2Info();
+      }
+    } catch (error) {
+      console.error("Failed to restart aria2:", error);
+    } finally {
+      setIsRestartingAria2(false);
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
     fetchBinaryInfo();
-  }, [fetchBinaryInfo]);
+    fetchAria2Info();
+    fetchFfmpegInfo();
+  }, [fetchBinaryInfo, fetchAria2Info, fetchFfmpegInfo]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -83,6 +135,10 @@ const SettingsPage = () => {
           updateStatus={updateStatus}
           updateError={updateError}
           onUpdate={handleUpdateYtDlp}
+          aria2Info={aria2Info}
+          isRestartingAria2={isRestartingAria2}
+          onRestartAria2={handleRestartAria2}
+          ffmpegInfo={ffmpegInfo}
         />
 
         <AboutSettings />

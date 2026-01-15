@@ -6,6 +6,7 @@ import {
   detectLinkType,
   startDirectDownload,
   useVideoActions,
+  DownloadItem,
 } from "./useDownload";
 import {
   detectPlatform,
@@ -14,6 +15,7 @@ import {
   FORMAT_OPTIONS,
   getAvailableQualityOptions,
 } from "../utils/formatters";
+import { ApiResponse } from "../types/download";
 
 export interface UseSingleDownloadReturn {
   // State
@@ -227,7 +229,7 @@ export function useSingleDownload(): UseSingleDownloadReturn {
     try {
       const isAudioOnly = selectedQuality === DownloadQuality.AUDIO_ONLY;
 
-      let result;
+      let result: ApiResponse<DownloadItem>;
       if (isDirectDownload) {
         // Use direct downloader for files
         result = await startDirectDownload({

@@ -29,7 +29,13 @@ import {
   ensureYtDlp,
   getBinaryInfo,
   updateYtDlp,
+  getFfmpegPath,
+  isFfmpegAvailable,
 } from "../services/utils/binary-manager";
+import {
+  getAria2Info,
+  restartAria2Daemon,
+} from "../services/utils/aria2-manager";
 import {
   getDefaultDownloadPath,
   getDownloadSubPath,
@@ -351,6 +357,72 @@ export function initializeDownloadIpc(): void {
           success: true,
           data: { path: info.path, version: info.version },
         };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    }
+  );
+
+  /**
+   * Get aria2 info
+   */
+  ipcMain.handle(
+    "download:get-aria2-info",
+    async (): Promise<
+      ApiResponse<{
+        path: string | null;
+        available: boolean;
+        running: boolean;
+      }>
+    > => {
+      try {
+        const info = await getAria2Info();
+        return { success: true, data: info };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    }
+  );
+
+  /**
+   * Restart aria2 daemon
+   */
+  ipcMain.handle(
+    "download:restart-aria2",
+    async (): Promise<ApiResponse<boolean>> => {
+      try {
+        await restartAria2Daemon();
+        return { success: true, data: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    }
+  );
+
+  /**
+   * Get ffmpeg info
+   */
+  ipcMain.handle(
+    "download:get-ffmpeg-info",
+    async (): Promise<
+      ApiResponse<{
+        path: string | null;
+        available: boolean;
+      }>
+    > => {
+      try {
+        const path = getFfmpegPath();
+        const available = isFfmpegAvailable();
+        return { success: true, data: { path, available } };
       } catch (error) {
         return {
           success: false,

@@ -18,7 +18,6 @@ const PlaylistPage = () => {
     isFetching,
     error,
     platform,
-    playlistItems,
     filteredItems,
     isAllSelected,
     selectedCount,

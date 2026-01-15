@@ -23,7 +23,7 @@ export const VideoThumbnail = ({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <FileVideo size={48} className="text-violet-500" />
+            <FileVideo size={48} className="text-primary" />
           </div>
         )}
         {duration && (

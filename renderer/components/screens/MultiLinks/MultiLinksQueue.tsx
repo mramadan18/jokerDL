@@ -18,9 +18,19 @@ export const MultiLinksQueue = ({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between px-1">
         <h3 className="font-semibold text-lg">Queue ({items.length})</h3>
-        <Button size="sm" variant="flat" startContent={<Settings2 size={16} />}>
+        {/* <Button
+          size="sm"
+          variant="bordered"
+          className="border-default-200 hover:border-brand-cyan/50 hover:text-brand-cyan transition-all group font-medium"
+          startContent={
+            <Settings2
+              size={16}
+              className="group-hover:rotate-90 transition-transform duration-500 text-default-400 group-hover:text-brand-cyan"
+            />
+          }
+        >
           Batch Settings
-        </Button>
+        </Button> */}
       </div>
 
       <ScrollShadow className="flex-1 flex flex-col gap-3 pr-2 pb-2">

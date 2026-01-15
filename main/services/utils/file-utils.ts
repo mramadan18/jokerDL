@@ -7,6 +7,8 @@ import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import slugify from "slugify";
+import { APP_CONFIG } from "../../../renderer/config/app-config";
+import { settingsService } from "../settings.service";
 
 /**
  * Get the default downloads directory
@@ -28,10 +30,11 @@ export function getDownloadSubPath(
     | "compressed"
     | "documents"
 ): string {
-  const basePath = getDefaultDownloadPath();
+  const settings = settingsService.getSettings();
+  const basePath = settings.downloadPath;
   // Capitalize the first letter of the subDir
   const capitalizedDir = subDir.charAt(0).toUpperCase() + subDir.slice(1);
-  const subPath = path.join(basePath, "IDM-Clone", capitalizedDir);
+  const subPath = path.join(basePath, capitalizedDir);
 
   // Ensure directory exists
   if (!fs.existsSync(subPath)) {
