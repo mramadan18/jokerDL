@@ -8,6 +8,7 @@ import { initializeDownloadIpc } from "./ipc/download-ipc";
 import { initializeHistoryIpc } from "./ipc/history-ipc";
 import { initializeSettingsIpc } from "./ipc/settings-ipc";
 import { startHistoryRecording } from "./services/history.service";
+import { UpdateService } from "./services/update.service";
 import {
   getFfmpegPath,
   isFfmpegAvailable,
@@ -36,6 +37,9 @@ if (isProd) {
       preload: path.join(__dirname, "preload.js"),
     },
   });
+
+  // Initialize Update Service
+  UpdateService.getInstance().init(mainWindow);
 
   // Register Window IPC handlers
   registerWindowIpc(mainWindow);
