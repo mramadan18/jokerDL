@@ -23,6 +23,5 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   runAfterFinish: true
-  installerSidebar: resources/installer-sidebar.png
   license: resources/license.txt
   include: resources/installer.nsh
