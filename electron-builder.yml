@@ -9,6 +9,9 @@ files:
     filter:
       - package.json
       - app
+protocols:
+  name: RemixDM
+  schemes: [remixdm]
 publish:
   provider: github
   owner: mramadan18
@@ -16,3 +19,10 @@ publish:
 win:
   target: nsis
   icon: resources/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  runAfterFinish: true
+  installerSidebar: resources/installer-sidebar.png
+  license: resources/license.txt
+  include: resources/installer.nsh

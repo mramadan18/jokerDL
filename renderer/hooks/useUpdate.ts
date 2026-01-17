@@ -28,11 +28,11 @@ export const useUpdate = () => {
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
 
   useEffect(() => {
-    const handleStatus = (_event: any, data: UpdateStatus) => {
+    const handleStatus = (data: UpdateStatus) => {
       setStatus(data);
     };
 
-    const handleProgress = (_event: any, data: UpdateProgress) => {
+    const handleProgress = (data: UpdateProgress) => {
       setProgress(data);
     };
 

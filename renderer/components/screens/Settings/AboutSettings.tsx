@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardBody, Button } from "@heroui/react";
 import { Download, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { APP_CONFIG } from "../../../config/app-config";
@@ -5,6 +6,11 @@ import { useUpdate } from "../../../hooks/useUpdate";
 
 export const AboutSettings = () => {
   const { status, progress, checkForUpdate, installUpdate } = useUpdate();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const getStatusIcon = () => {
     switch (status.status) {
@@ -46,7 +52,8 @@ export const AboutSettings = () => {
           {APP_CONFIG.name}
         </h2>
         <p className="text-xs font-bold text-primary/60 tracking-widest uppercase mb-4">
-          Version {APP_CONFIG.version} (Stable)
+          Version {mounted ? APP_CONFIG.version : "..."}{" "}
+          {mounted && !APP_CONFIG.isBeta && "(Stable)"}
         </p>
         <p className="text-default-500 max-w-sm mb-6">
           {APP_CONFIG.description}
@@ -86,22 +93,29 @@ export const AboutSettings = () => {
                 {status.status === "available"
                   ? "Download Update"
                   : status.status === "checking"
-                  ? "Checking..."
-                  : status.status === "error"
-                  ? "Retry Check"
-                  : "Check Updates"}
+                    ? "Checking..."
+                    : status.status === "error"
+                      ? "Retry Check"
+                      : "Check Updates"}
               </Button>
             )}
           </div>
 
           {status.message && (
-            <p
-              className={`text-sm ${
-                status.status === "error" ? "text-danger" : "text-default-500"
-              }`}
-            >
-              {status.message}
-            </p>
+            <div className="flex flex-col items-center">
+              <p
+                className={`text-sm ${
+                  status.status === "error" ? "text-danger" : "text-default-500"
+                }`}
+              >
+                {status.message}
+              </p>
+              {status.error && status.status === "error" && (
+                <p className="text-[10px] text-danger/60 mt-1 max-w-xs break-all">
+                  {status.error}
+                </p>
+              )}
+            </div>
           )}
 
           {progress && status.status === "available" && (

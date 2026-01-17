@@ -1,0 +1,15 @@
+Installation Complete!
+
+Thank you for choosing RemixDM.
+
+You can now start the application from your desktop or start menu.
+
+What's Next?
+- Add your first download link
+- Check settings for customized download paths
+- Integration with your favorite browsers
+
+For support and feedback, please visit our GitHub repository:
+https://github.com/mramadan18/remix-dm
+
+Happy Downloading!

@@ -73,34 +73,36 @@ const Topbar = () => {
         className="flex items-center gap-2"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        <Dropdown placement="bottom-end">
-          <DropdownTrigger>
-            <Button
-              isIconOnly
-              variant="light"
-              size="sm"
-              className="text-default-500 hover:text-foreground hover:bg-default-100"
-            >
-              <Settings size={18} />
-            </Button>
-          </DropdownTrigger>
-          <DropdownMenu aria-label="Settings Menu" variant="flat">
-            <DropdownItem
-              key="reload"
-              startContent={<RefreshCw size={16} />}
-              onPress={reload}
-            >
-              Reload App
-            </DropdownItem>
-            <DropdownItem
-              key="devtools"
-              startContent={<Terminal size={16} />}
-              onPress={toggleDevTools}
-            >
-              Developer Tools
-            </DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+        {process.env.NODE_ENV === "development" && (
+          <Dropdown placement="bottom-end">
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                variant="light"
+                size="sm"
+                className="text-default-500 hover:text-foreground hover:bg-default-100"
+              >
+                <Settings size={18} />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu aria-label="Settings Menu" variant="flat">
+              <DropdownItem
+                key="reload"
+                startContent={<RefreshCw size={16} />}
+                onPress={reload}
+              >
+                Reload App
+              </DropdownItem>
+              <DropdownItem
+                key="devtools"
+                startContent={<Terminal size={16} />}
+                onPress={toggleDevTools}
+              >
+                Developer Tools
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        )}
 
         <Button
           isIconOnly

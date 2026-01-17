@@ -57,7 +57,7 @@ export class UpdateService {
     autoUpdater.on("error", (err) => {
       this.sendToWindow("update-status", {
         status: "error",
-        message: "Error in auto-updater.",
+        message: `Update Error: ${err.message}`,
         error: err.message,
       });
     });
@@ -77,6 +77,14 @@ export class UpdateService {
     });
 
     ipcMain.on("check-for-update", () => {
+      if (process.env.NODE_ENV !== "production") {
+        this.sendToWindow("update-status", {
+          status: "error",
+          message: "Update check is only available in the production build.",
+          error: "Development mode detected",
+        });
+        return;
+      }
       autoUpdater.checkForUpdates();
     });
 

@@ -78,7 +78,7 @@ const Sidebar = () => {
         </nav>
       </div>
 
-      <div className="px-2">
+      {/* <div className="px-2">
         <div className="bg-default-50 p-4 rounded-xl border border-default-100">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-default-500">
@@ -91,7 +91,7 @@ const Sidebar = () => {
           </div>
           <p className="text-xs text-default-400 mt-2">126 GB used of 512 GB</p>
         </div>
-      </div>
+      </div> */}
     </aside>
   );
 };

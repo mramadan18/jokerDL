@@ -1,0 +1,10 @@
+Welcome to RemixDM!
+
+RemixDM is a powerful download manager designed to help you organize and speed up your downloads.
+
+System Requirements:
+- Windows 10 or later (64-bit)
+- 200MB available disk space
+- Internet connection for downloading files
+
+Please click "Next" to continue with the installation.

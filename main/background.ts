@@ -1,5 +1,5 @@
 import path from "path";
-import { app, ipcMain } from "electron";
+import { app } from "electron";
 import serve from "electron-serve";
 import { createWindow } from "./helpers";
 import { registerWindowIpc } from "./ipc/window-ipc";
@@ -7,71 +7,122 @@ import { registerShellIpc } from "./ipc/shell-ipc";
 import { initializeDownloadIpc } from "./ipc/download-ipc";
 import { initializeHistoryIpc } from "./ipc/history-ipc";
 import { initializeSettingsIpc } from "./ipc/settings-ipc";
+import { registerAppIpc } from "./ipc/app-ipc";
 import { startHistoryRecording } from "./services/history.service";
 import { UpdateService } from "./services/update.service";
 import {
   getFfmpegPath,
   isFfmpegAvailable,
 } from "./services/utils/binary-manager";
+import {
+  registerProtocolClient,
+  handleProtocolUrl,
+} from "./helpers/protocol-handler";
 
 const isProd = process.env.NODE_ENV === "production";
 
-if (isProd) {
-  serve({ directory: "app" });
+let mainWindow: any;
+
+// Register protocol handler
+registerProtocolClient();
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // In production, if we don't get the lock, we quit.
+  // In development, we continue so the new instance can signal the old one to quit.
+  if (isProd) {
+    app.quit();
+  }
 } else {
-  app.setPath("userData", `${app.getPath("userData")} (development)`);
-}
+  app.on("second-instance", (event, commandLine) => {
+    // If we are in development and a second instance starts,
+    // the old instance (this one) should quit.
+    if (!isProd) {
+      app.exit();
+      return;
+    }
 
-(async () => {
-  await app.whenReady();
+    // In production, someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
 
-  const mainWindow = createWindow("main", {
-    minWidth: 960,
-    minHeight: 600,
-    width: 1100,
-    height: 720,
-    titleBarOverlay: true,
-    frame: false,
-    center: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-    },
+    // Protocol handler for Windows
+    const url = commandLine.pop();
+    if (url && url.startsWith("remixdm://")) {
+      handleProtocolUrl(url, mainWindow);
+    }
   });
 
-  // Initialize Update Service
-  UpdateService.getInstance().init(mainWindow);
-
-  // Register Window IPC handlers
-  registerWindowIpc(mainWindow);
-
-  // Register Shell IPC handlers
-  registerShellIpc();
-
-  // Initialize Download IPC handlers
-  initializeDownloadIpc();
-  initializeHistoryIpc();
-  initializeSettingsIpc();
-  startHistoryRecording();
-
-  // Check ffmpeg availability
-  const ffmpegAvailable = isFfmpegAvailable();
-  const ffmpegLocation = getFfmpegPath();
-  console.log("[Background] ffmpeg available:", ffmpegAvailable);
-  console.log("[Background] ffmpeg location:", ffmpegLocation);
-
   if (isProd) {
-    await mainWindow.loadURL("app://./home");
+    serve({ directory: "app" });
   } else {
-    const port = process.argv[2];
-    await mainWindow.loadURL(`http://localhost:${port}/home`);
-    mainWindow.webContents.openDevTools();
+    app.setPath("userData", `${app.getPath("userData")} (development)`);
   }
-})();
+
+  (async () => {
+    await app.whenReady();
+
+    mainWindow = createWindow("main", {
+      minWidth: 960,
+      minHeight: 600,
+      width: 1100,
+      height: 720,
+      titleBarOverlay: true,
+      frame: false,
+      center: true,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+      },
+    });
+
+    // Initialize Services & IPC
+    initializeServices(mainWindow);
+
+    if (isProd) {
+      await mainWindow.loadURL("app://./home");
+    } else {
+      const port = process.argv[2];
+      await mainWindow.loadURL(`http://localhost:${port}/home`);
+      mainWindow.webContents.openDevTools();
+    }
+
+    // Check if app was opened with a protocol link on startup
+    const url = process.argv.find((arg) => arg.startsWith("remixdm://"));
+    if (url) {
+      handleProtocolUrl(url, mainWindow);
+    }
+  })();
+}
 
 app.on("window-all-closed", () => {
   app.quit();
 });
 
-ipcMain.on("message", async (event, arg) => {
-  event.reply("message", `${arg} World!`);
-});
+function initializeServices(window: any) {
+  // Initialize Update Service
+  UpdateService.getInstance().init(window);
+
+  // Register IPC handlers
+  registerWindowIpc(window);
+  registerShellIpc();
+  registerAppIpc();
+  initializeDownloadIpc();
+  initializeHistoryIpc();
+  initializeSettingsIpc();
+
+  // Start background services
+  startHistoryRecording();
+
+  // Check binary status
+  logBinaryStatus();
+}
+
+function logBinaryStatus() {
+  const ffmpegAvailable = isFfmpegAvailable();
+  const ffmpegLocation = getFfmpegPath();
+  console.log("[Background] ffmpeg available:", ffmpegAvailable);
+  console.log("[Background] ffmpeg location:", ffmpegLocation);
+}

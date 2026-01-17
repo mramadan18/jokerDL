@@ -36,6 +36,7 @@
   - **Conflict Management**: Choose what happens when a file exists (Rename, Overwrite, or Skip).
   - **Engine Status**: Real-time status monitor for `yt-dlp`, `Aria2`, and `FFmpeg`.
 - 💎 **Premium UI**: Dark-mode-first aesthetic with Glassmorphism effects and smooth Framer Motion animations.
+- 🔗 **Deep Linking**: Launch downloads directly from your browser with `remixdm://` links.
 - 🛠️ **Binary Management**: Automatically downloads and updates the latest `yt-dlp` and `aria2` engines in the background.
 
 ---
@@ -48,6 +49,7 @@
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
 - **Core Engine**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) & [aria2](https://github.com/aria2/aria2)
+- **Packaging**: [electron-builder](https://www.electron.build/)
 
 ---
 
@@ -94,6 +96,7 @@
 - `main/`: Electron main process files, IPC handlers, and backend services.
   - `services/`: Download services, binary management, and persistent settings service.
   - `ipc/`: Inter-process communication handlers for settings, history, and downloads.
+  - `helpers/`: Utility helpers including protocol handlers.
 - `renderer/`: Next.js frontend, components, hooks, and styles.
   - `components/`: React components for UI screens and settings modules.
   - `hooks/`: Custom React hooks for download management and centralized settings.
@@ -110,5 +113,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ---
 
 <p align="center">
-  Developed with ❤️ by <b>mramadan18</b>
+  Developed with ❤️ by <b>Mahmoud Ramadan</b>
 </p>

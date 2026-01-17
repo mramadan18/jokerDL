@@ -19,6 +19,9 @@ const handler = {
       ipcRenderer.removeListener(channel, subscription);
     };
   },
+  getVersion() {
+    return ipcRenderer.sendSync("get-app-version");
+  },
 };
 
 contextBridge.exposeInMainWorld("ipc", handler);
