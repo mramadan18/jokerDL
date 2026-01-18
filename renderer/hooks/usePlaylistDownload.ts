@@ -112,41 +112,42 @@ export const usePlaylistDownload = (): UsePlaylistDownloadReturn => {
       selected.includes(v.id),
     );
 
+    setIsBulkDownloading(true);
+
     // Get the base playlists directory
     const playlistsPathRes = await getDownloadSubPath("playlists");
-    let playlistPath = playlistsPathRes.success ? playlistsPathRes.data! : "";
+    const playlistPath = playlistsPathRes.success ? playlistsPathRes.data! : "";
 
-    // Add a subfolder with the playlist name
-    if (videoInfo?.playlist?.title && playlistPath) {
-      const cleanTitle = videoInfo.playlist.title
-        .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
-        .trim();
-      playlistPath = `${playlistPath}/${cleanTitle}`;
-    }
+    // CREATE A MODIFIED VIDEO INFO TO SEND IN ONE IPC CALL
+    // This is much faster and more reliable than looping IPC calls
+    const modifiedVideoInfo = {
+      ...videoInfo,
+      playlist: {
+        ...videoInfo.playlist,
+        videos: videosToDownload,
+      },
+    } as any;
 
-    // Add each video to the queue
-    for (const video of videosToDownload) {
-      // Create a minimal videoInfo object so the UI has a title and thumbnail
-      const minimalVideoInfo = {
-        id: video.id,
-        title: video.title,
-        thumbnail: video.thumbnail,
-        url: video.url,
-        webpage_url: video.url,
-        duration: video.duration,
-      } as any;
-
-      await addDownload(minimalVideoInfo, {
-        url: video.url,
+    try {
+      const result = await addDownload(modifiedVideoInfo, {
+        url: url,
         quality: selectedQuality,
         audioOnly: selectedQuality === DownloadQuality.AUDIO_ONLY,
         format: selectedQuality === DownloadQuality.AUDIO_ONLY ? "mp3" : "mp4",
         outputPath: playlistPath,
+        isPlaylist: true,
       });
-    }
 
-    setIsBulkDownloading(false);
-    router.push("/downloads");
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      setIsBulkDownloading(false);
+      router.push("/downloads");
+    } catch (err: any) {
+      setIsBulkDownloading(false);
+      // Logic for error display if needed
+    }
   };
 
   return {

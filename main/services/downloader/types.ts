@@ -178,6 +178,8 @@ export interface DownloadOptions {
   proxy?: string;
   cookies?: string; // Path to cookies file
   verbose?: boolean; // Enable verbose logging for debugging (e.g., YouTube empty file errors)
+  isPlaylist?: boolean; // Indicates if this download is part of a playlist
+  playlistIndex?: number; // Index of the video in a playlist
 }
 
 /**

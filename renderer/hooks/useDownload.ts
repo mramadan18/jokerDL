@@ -21,12 +21,12 @@ import {
  * Extract video information from URL
  */
 export async function extractVideoInfo(
-  url: string
+  url: string,
 ): Promise<ApiResponse<VideoInfo>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.EXTRACT_VIDEO_INFO,
-      url
+      url,
     );
     return result as ApiResponse<VideoInfo>;
   } catch (error) {
@@ -43,7 +43,7 @@ export async function extractVideoInfo(
  */
 export async function startDownload(
   videoInfo: VideoInfo | null,
-  options: DownloadOptions
+  options: DownloadOptions,
 ): Promise<ApiResponse<DownloadItem>> {
   try {
     const result = await window.ipc.invoke(DownloadIpcChannels.START_DOWNLOAD, {
@@ -64,12 +64,12 @@ export async function startDownload(
  * Pause a download
  */
 export async function pauseDownload(
-  downloadId: string
+  downloadId: string,
 ): Promise<ApiResponse<boolean>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.PAUSE_DOWNLOAD,
-      downloadId
+      downloadId,
     );
     return result as ApiResponse<boolean>;
   } catch (error) {
@@ -85,12 +85,12 @@ export async function pauseDownload(
  * Resume a download
  */
 export async function resumeDownload(
-  downloadId: string
+  downloadId: string,
 ): Promise<ApiResponse<boolean>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.RESUME_DOWNLOAD,
-      downloadId
+      downloadId,
     );
     return result as ApiResponse<boolean>;
   } catch (error) {
@@ -106,12 +106,12 @@ export async function resumeDownload(
  * Cancel a download
  */
 export async function cancelDownload(
-  downloadId: string
+  downloadId: string,
 ): Promise<ApiResponse<boolean>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.CANCEL_DOWNLOAD,
-      downloadId
+      downloadId,
     );
     return result as ApiResponse<boolean>;
   } catch (error) {
@@ -130,7 +130,7 @@ export async function getAllDownloads(): Promise<ApiResponse<DownloadItem[]>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.GET_ALL_DOWNLOADS,
-      null
+      null,
     );
     return result as ApiResponse<DownloadItem[]>;
   } catch (error) {
@@ -148,7 +148,7 @@ export async function clearCompletedDownloads(): Promise<ApiResponse<number>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.CLEAR_COMPLETED,
-      null
+      null,
     );
     return result as ApiResponse<number>;
   } catch (error) {
@@ -164,7 +164,7 @@ export async function clearCompletedDownloads(): Promise<ApiResponse<number>> {
  * Open file location in explorer
  */
 export async function openFileLocation(
-  path: string
+  path: string,
 ): Promise<ApiResponse<boolean>> {
   try {
     const result = await window.ipc.invoke("shell:show-item-in-folder", path);
@@ -220,7 +220,7 @@ export async function getDownloadSubPath(
     | "others"
     | "programs"
     | "compressed"
-    | "documents"
+    | "documents",
 ): Promise<ApiResponse<string>> {
   try {
     const result = await window.ipc.invoke("download:get-sub-path", type);
@@ -241,12 +241,12 @@ export async function getDownloadSubPath(
  */
 export async function detectLinkType(
   url: string,
-  mode: DetectionMode = "auto"
+  mode: DetectionMode = "auto",
 ): Promise<ApiResponse<LinkTypeResult>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.DETECT_LINK_TYPE,
-      { url, mode }
+      { url, mode },
     );
     return result as ApiResponse<LinkTypeResult>;
   } catch (error) {
@@ -262,12 +262,12 @@ export async function detectLinkType(
  * Start a direct download (using aria2)
  */
 export async function startDirectDownload(
-  options: DownloadOptions
+  options: DownloadOptions,
 ): Promise<ApiResponse<DownloadItem>> {
   try {
     const result = await window.ipc.invoke(
       DownloadIpcChannels.START_DIRECT_DOWNLOAD,
-      options
+      options,
     );
     return result as ApiResponse<DownloadItem>;
   } catch (error) {
@@ -332,10 +332,10 @@ export function useDownloads() {
           prev.map((d) =>
             d.id === prog.downloadId
               ? { ...d, progress: prog, status: prog.status }
-              : d
-          )
+              : d,
+          ),
         );
-      }
+      },
     );
 
     const unsubComplete = window.ipc.on(
@@ -343,9 +343,9 @@ export function useDownloads() {
       (item) => {
         const downloadItem = item as DownloadItem;
         setDownloads((prev) =>
-          prev.map((d) => (d.id === downloadItem.id ? downloadItem : d))
+          prev.map((d) => (d.id === downloadItem.id ? downloadItem : d)),
         );
-      }
+      },
     );
 
     const unsubError = window.ipc.on(
@@ -353,7 +353,7 @@ export function useDownloads() {
       (data) => {
         const { item } = data as { item: DownloadItem; error: string };
         setDownloads((prev) => prev.map((d) => (d.id === item.id ? item : d)));
-      }
+      },
     );
 
     const unsubStatusChanged = window.ipc.on(
@@ -364,19 +364,19 @@ export function useDownloads() {
           const exists = prev.find((d) => d.id === downloadItem.id);
           if (exists) {
             return prev.map((d) =>
-              d.id === downloadItem.id ? downloadItem : d
+              d.id === downloadItem.id ? downloadItem : d,
             );
           }
           return [...prev, downloadItem];
         });
-      }
+      },
     );
 
     const unsubRemoved = window.ipc.on(
       DownloadIpcChannels.DOWNLOAD_REMOVED,
       (downloadId) => {
         setDownloads((prev) => prev.filter((d) => d.id !== downloadId));
-      }
+      },
     );
 
     return () => {
@@ -393,11 +393,16 @@ export function useDownloads() {
     async (videoInfo: VideoInfo | null, options: DownloadOptions) => {
       const result = await startDownload(videoInfo, options);
       if (result.success && result.data) {
-        setDownloads((prev) => [...prev, result.data!]);
+        const newData = result.data;
+        if (Array.isArray(newData)) {
+          setDownloads((prev) => [...prev, ...newData]);
+        } else {
+          setDownloads((prev) => [...prev, newData]);
+        }
       }
       return result;
     },
-    []
+    [],
   );
 
   const pause = useCallback(async (downloadId: string) => {
@@ -420,8 +425,8 @@ export function useDownloads() {
           (d) =>
             d.status !== DownloadStatus.COMPLETED &&
             d.status !== DownloadStatus.CANCELLED &&
-            d.status !== DownloadStatus.FAILED
-        )
+            d.status !== DownloadStatus.FAILED,
+        ),
       );
     }
     return result;
@@ -439,13 +444,13 @@ export function useDownloads() {
   const activeDownloads = downloads.filter(
     (d) =>
       d.status === DownloadStatus.DOWNLOADING ||
-      d.status === DownloadStatus.PENDING
+      d.status === DownloadStatus.PENDING,
   );
   const completedDownloads = downloads.filter(
-    (d) => d.status === DownloadStatus.COMPLETED
+    (d) => d.status === DownloadStatus.COMPLETED,
   );
   const failedDownloads = downloads.filter(
-    (d) => d.status === DownloadStatus.FAILED
+    (d) => d.status === DownloadStatus.FAILED,
   );
 
   return {
@@ -519,7 +524,7 @@ export function useVideoActions() {
     async (videoInfo: VideoInfo | null, options: DownloadOptions) => {
       return startDownload(videoInfo, options);
     },
-    []
+    [],
   );
 
   const startDirect = useCallback(async (options: DownloadOptions) => {
