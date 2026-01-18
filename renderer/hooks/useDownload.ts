@@ -50,7 +50,7 @@ export async function startDownload(
       videoInfo,
       options,
     });
-    return result as ApiResponse<DownloadItem>;
+    return result as ApiResponse<DownloadItem | DownloadItem[]>;
   } catch (error) {
     return {
       success: false,

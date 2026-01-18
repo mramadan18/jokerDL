@@ -237,7 +237,7 @@ export function useSingleDownload(): UseSingleDownloadReturn {
     try {
       const isAudioOnly = selectedQuality === DownloadQuality.AUDIO_ONLY;
 
-      let result: ApiResponse<DownloadItem>;
+      let result: ApiResponse<DownloadItem | DownloadItem[]>;
       if (isDirectDownload) {
         // Use direct downloader for files
         result = await startDirectDownload({
