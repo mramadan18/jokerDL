@@ -53,9 +53,10 @@ export const HistoryItem = ({
 
   return (
     <Card
+      as={"div"}
       isPressable
+      className="group border border-default-100 hover:border-primary/50 transition-colors shadow-none hover:shadow-md bg-content1 cursor-pointer"
       onPress={() => onOpenFile(item.path)}
-      className="group border border-default-100 hover:border-primary/50 transition-colors shadow-none hover:shadow-md bg-content1"
     >
       <CardBody className="p-3">
         <div className="flex items-center gap-4">
@@ -109,16 +110,13 @@ export const HistoryItem = ({
               variant="light"
               size="sm"
               className="text-default-400 hover:text-primary"
-              onPress={(e) => {
-                e.continuePropagation();
-                onOpenFolder(item.path);
-              }}
+              onPress={() => onOpenFolder(item.path)}
             >
               <FolderOpen size={18} />
             </Button>
 
             <Dropdown>
-              <DropdownTrigger>
+              <DropdownTrigger onClick={(e) => e.stopPropagation()}>
                 <Button
                   isIconOnly
                   variant="light"

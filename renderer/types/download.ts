@@ -236,7 +236,7 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
   youtube: {
     name: "YouTube",
     icon: "youtube",
-    domains: ["youtube.com", "youtu.be"],
+    domains: ["youtube.com", "youtu.be", "youtube-nocookie.com"],
     supportsPlaylist: true,
     supportsSubtitles: true,
     supportsQualitySelection: true,
@@ -252,7 +252,7 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
   instagram: {
     name: "Instagram",
     icon: "instagram",
-    domains: ["instagram.com"],
+    domains: ["instagram.com", "instagr.am"],
     supportsPlaylist: false,
     supportsSubtitles: false,
     supportsQualitySelection: true,
@@ -268,7 +268,7 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
   facebook: {
     name: "Facebook",
     icon: "facebook",
-    domains: ["facebook.com", "fb.watch"],
+    domains: ["facebook.com", "fb.watch", "fb.com"],
     supportsPlaylist: false,
     supportsSubtitles: true,
     supportsQualitySelection: true,
@@ -276,9 +276,25 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
   vimeo: {
     name: "Vimeo",
     icon: "vimeo",
-    domains: ["vimeo.com"],
+    domains: ["vimeo.com", "player.vimeo.com"],
     supportsPlaylist: true,
     supportsSubtitles: true,
+    supportsQualitySelection: true,
+  },
+  dailymotion: {
+    name: "Dailymotion",
+    icon: "dailymotion",
+    domains: ["dailymotion.com", "dai.ly"],
+    supportsPlaylist: true,
+    supportsSubtitles: true,
+    supportsQualitySelection: true,
+  },
+  twitch: {
+    name: "Twitch",
+    icon: "twitch",
+    domains: ["twitch.tv", "clips.twitch.tv"],
+    supportsPlaylist: false,
+    supportsSubtitles: false,
     supportsQualitySelection: true,
   },
 };

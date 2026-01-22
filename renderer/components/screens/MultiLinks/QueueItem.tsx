@@ -1,14 +1,6 @@
 import { Button, Card, CardBody, Chip } from "@heroui/react";
 import { FileCode, Trash2, Video, FileDown } from "lucide-react";
-
-// دالة مساعدة لتنسيق الحجم (يمكن استيرادها من utils إذا كانت موجودة)
-const formatBytes = (bytes?: number) => {
-  if (!bytes) return "";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-};
+import { formatBytes } from "../../../utils/formatters";
 
 interface QueueItemProps {
   url: string;
@@ -64,8 +56,6 @@ export const QueueItem = ({
     if (type === "direct") return <FileDown size={20} />;
     return <FileCode size={20} />;
   };
-
-  console.log({ url, title, size, type, status, error });
 
   return (
     <Card className="w-full flex-none animate-appearance-in">

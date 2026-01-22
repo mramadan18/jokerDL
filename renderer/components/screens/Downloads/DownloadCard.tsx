@@ -1,22 +1,17 @@
 import { Card, CardBody, Progress, Button, Chip } from "@heroui/react";
-import {
-  Pause,
-  Play,
-  X,
-  FileVideo,
-  Music,
-  Archive,
-  Package,
-  FileText,
-  File,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Zap,
-  FolderOpen,
-} from "lucide-react";
+import { Pause, Play, X, Zap, Clock, FolderOpen } from "lucide-react";
 import { DownloadStatus, DownloadItem } from "../../../types/download";
 import { formatBytes } from "../../../utils/formatters";
+import { getFileIcon } from "../../../utils/file-icons";
+import {
+  getStatusColor,
+  getStatusLabel,
+  getStatusIcon,
+  isActiveStatus,
+  isPausableStatus,
+  isResumableStatus,
+  isCancellableStatus,
+} from "../../../utils/status-utils";
 import Image from "next/image";
 
 interface DownloadCardProps {
@@ -28,137 +23,6 @@ interface DownloadCardProps {
   onOpenFile: (path: string) => void;
 }
 
-const getStatusColor = (
-  status: DownloadStatus,
-): "primary" | "success" | "warning" | "danger" | "default" => {
-  switch (status) {
-    case DownloadStatus.DOWNLOADING:
-    case DownloadStatus.MERGING:
-      return "primary";
-    case DownloadStatus.COMPLETED:
-      return "success";
-    case DownloadStatus.PAUSED:
-    case DownloadStatus.PENDING:
-      return "warning";
-    case DownloadStatus.FAILED:
-    case DownloadStatus.CANCELLED:
-      return "danger";
-    default:
-      return "default";
-  }
-};
-
-const getStatusLabel = (status: DownloadStatus): string => {
-  switch (status) {
-    case DownloadStatus.PENDING:
-      return "Pending";
-    case DownloadStatus.EXTRACTING:
-      return "Extracting...";
-    case DownloadStatus.DOWNLOADING:
-      return "Downloading";
-    case DownloadStatus.MERGING:
-      return "Merging...";
-    case DownloadStatus.CONVERTING:
-      return "Converting...";
-    case DownloadStatus.COMPLETED:
-      return "Completed";
-    case DownloadStatus.PAUSED:
-      return "Paused";
-    case DownloadStatus.FAILED:
-      return "Failed";
-    case DownloadStatus.CANCELLED:
-      return "Cancelled";
-    default:
-      return status;
-  }
-};
-
-const getStatusIcon = (status: DownloadStatus) => {
-  switch (status) {
-    case DownloadStatus.COMPLETED:
-      return <CheckCircle2 size={12} />;
-    case DownloadStatus.FAILED:
-    case DownloadStatus.CANCELLED:
-      return <AlertCircle size={12} />;
-    case DownloadStatus.PAUSED:
-      return <Pause size={12} />;
-    case DownloadStatus.PENDING:
-      return <Clock size={12} />;
-    default:
-      return null;
-  }
-};
-
-const getFileIcon = (filename: string | null) => {
-  if (!filename) return <File size={24} />;
-
-  const ext = filename.split(".").pop()?.toLowerCase();
-
-  const categories = {
-    programs: [
-      "exe",
-      "msi",
-      "apk",
-      "dmg",
-      "pkg",
-      "appimage",
-      "deb",
-      "rpm",
-      "vspackage",
-      "vsix",
-    ],
-    audios: ["mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "mka", "opus"],
-    videos: [
-      "mp4",
-      "mkv",
-      "avi",
-      "mov",
-      "wmv",
-      "flv",
-      "webm",
-      "3gp",
-      "m4v",
-      "mpg",
-      "mpeg",
-    ],
-    compressed: [
-      "zip",
-      "rar",
-      "7z",
-      "tar",
-      "gz",
-      "bz2",
-      "xz",
-      "tgz",
-      "iso",
-      "img",
-    ],
-    documents: [
-      "pdf",
-      "doc",
-      "docx",
-      "xls",
-      "xlsx",
-      "ppt",
-      "pptx",
-      "txt",
-      "rtf",
-      "odt",
-      "ods",
-      "odp",
-      "csv",
-    ],
-  };
-
-  if (categories.programs.includes(ext!)) return <Package size={24} />;
-  if (categories.audios.includes(ext!)) return <Music size={24} />;
-  if (categories.videos.includes(ext!)) return <FileVideo size={24} />;
-  if (categories.compressed.includes(ext!)) return <Archive size={24} />;
-  if (categories.documents.includes(ext!)) return <FileText size={24} />;
-
-  return <File size={24} />;
-};
-
 export const DownloadCard = ({
   item,
   onPause,
@@ -167,19 +31,10 @@ export const DownloadCard = ({
   onOpenLocation,
   onOpenFile,
 }: DownloadCardProps) => {
-  const isActive =
-    item.status === DownloadStatus.DOWNLOADING ||
-    item.status === DownloadStatus.MERGING ||
-    item.status === DownloadStatus.EXTRACTING ||
-    item.status === DownloadStatus.CONVERTING;
-
-  const isPausable = item.status === DownloadStatus.DOWNLOADING;
-  const isResumable =
-    item.status === DownloadStatus.PAUSED ||
-    item.status === DownloadStatus.FAILED;
-  const isCancellable =
-    item.status !== DownloadStatus.COMPLETED &&
-    item.status !== DownloadStatus.CANCELLED;
+  const isActive = isActiveStatus(item.status);
+  const isPausable = isPausableStatus(item.status);
+  const isResumable = isResumableStatus(item.status);
+  const isCancellable = isCancellableStatus(item.status);
 
   const fullPath =
     item.outputPath && item.filename

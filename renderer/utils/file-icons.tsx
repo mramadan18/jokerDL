@@ -5,12 +5,24 @@ import {
   Archive,
   FileText,
   Package,
+  LucideIcon,
 } from "lucide-react";
+import { getSimpleFileType, SimpleFileType } from "./file-categories";
+
+// Re-export for backward compatibility
+export type { SimpleFileType };
+
+interface FileIconProps {
+  Icon: LucideIcon;
+  className: string;
+}
 
 /**
  * Get appropriate icon component and className for file type
  */
-export const getFileIconProps = (type?: string) => {
+export const getFileIconProps = (
+  type?: SimpleFileType | string,
+): FileIconProps => {
   switch (type) {
     case "video":
       return { Icon: FileVideo, className: "text-primary" };
@@ -28,51 +40,22 @@ export const getFileIconProps = (type?: string) => {
 };
 
 /**
- * Get file type from filename extension
+ * Get file icon JSX element for a given filename
+ * @param filename - The filename to get icon for
+ * @param size - Icon size (default: 24)
  */
-export const getFileTypeFromExtension = (
-  filename: string,
-): "video" | "audio" | "compressed" | "document" | "program" | "file" => {
-  if (!filename) return "file";
+export const getFileIcon = (filename: string | null, size: number = 24) => {
+  if (!filename) return <File size={size} />;
 
-  const extension = filename.split(".").pop()?.toLowerCase();
+  const type = getSimpleFileType(filename);
+  const { Icon, className } = getFileIconProps(type);
+  return <Icon size={size} className={className} />;
+};
 
-  // Video extensions
-  if (
-    ["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v"].includes(
-      extension || "",
-    )
-  ) {
-    return "video";
-  }
-
-  // Audio extensions
-  if (
-    ["mp3", "wav", "flac", "aac", "ogg", "wma", "m4a"].includes(extension || "")
-  ) {
-    return "audio";
-  }
-
-  // Compressed files
-  if (
-    ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"].includes(extension || "")
-  ) {
-    return "compressed";
-  }
-
-  // Documents
-  if (["pdf", "doc", "docx", "txt", "rtf", "odt"].includes(extension || "")) {
-    return "document";
-  }
-
-  // Programs/Executables
-  if (
-    ["exe", "msi", "dmg", "pkg", "deb", "rpm", "appimage"].includes(
-      extension || "",
-    )
-  ) {
-    return "program";
-  }
-
-  return "file";
+/**
+ * Get file type from filename extension
+ * @deprecated Use getSimpleFileType from file-categories.ts instead
+ */
+export const getFileTypeFromExtension = (filename: string): SimpleFileType => {
+  return getSimpleFileType(filename);
 };
